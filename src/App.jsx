@@ -9,6 +9,7 @@ const App = () => {
         <Router> 
             <Navbar />
             <Routes>    
+                <Route path="/Johnathan-Portfolio" element={<Home />} /> {/* self closing routes that renders components */}
                 <Route path="/" element={<Home />} /> {/* self closing routes that renders components */}
                 <Route path = "/about" element = {<About />} />
                 <Route path = "/projects" element = {<Projects />} />
