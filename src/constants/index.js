@@ -1,4 +1,4 @@
-import { meta, shopify, starbucks, tesla } from "../assets/images";
+import { mayahdesign, meta, nih, shopify, stanford, starbucks, tesla, umich } from "../assets/images";
 import {
     car,
     contact,
@@ -155,7 +155,7 @@ export const experiences = [
     {
         title: "Software Engineer Intern",
         company_name: "Mayah Design",
-        icon: starbucks,
+        icon: mayahdesign,
         iconBg: "#accbe1",
         date: "August 2024 - Present",
         points: [
@@ -168,8 +168,8 @@ export const experiences = [
     {
         title: "AR/VR Software Engineering Intern",
         company_name: "National Institutes of Health",
-        icon: tesla,
-        iconBg: "#fbc3bc",
+        icon: nih,
+        iconBg: "#d6d6d6",
         date: "May 2024 - August 2024",
         points: [
             "Pioneered a medical augmented reality interaction and visualization application using Unity, C#, Photon Fusion, OpenAI, and Microsoft Azure Speech Cognition Services for surgical application.",
@@ -180,8 +180,8 @@ export const experiences = [
     {
         title: "Research Assistant",
         company_name: "University of Michigan Cai Lab",
-        icon: shopify,
-        iconBg: "#b7e4c7",
+        icon: umich,
+        iconBg: "#ffeb57",
         date: "September 2023 - May 2024",
         points: [
             "Innovated machine learning algorithm for 3D segmentation of neurons in brain scans leveraging Python, U-Net architecture, and libraries like wandb, TensorFlow, and PyTorch, leading to 50% reduction in memory usage.",
@@ -192,8 +192,8 @@ export const experiences = [
     {
         title: "Research Assistant",
         company_name: "Stanford Optima Group",
-        icon: meta,
-        iconBg: "#a2d2ff",
+        icon: stanford,
+        iconBg: "#d44e4e",
         date: "May 2023 - August 2023",
         points: [
             "Conceptualized and executed research project leveraging Google Cloud Platform, HuggingFace Transformers, Numpy, Pandas, PyTorch, and Gradio to compare effectiveness of traditional Convolutional Neural Networks against Visual Large Language Models on recognizing Glaucoma Images.",
@@ -232,8 +232,8 @@ export const projects = [
         iconUrl: threads,
         theme: 'btn-back-green',
         name: 'Professor Parrot',
-        description: 'mplemented an AI-powered Advanced Placement (AP) tutoring website using Hybrid.js, Redis, Lang-chain, OpenAI, and deployed with Heroku to simplify and explain AP material to students without access to AP courses.',
-        link: '',
+        description: 'Implemented an AI-powered Advanced Placement (AP) tutoring website using Hybrid.js, Redis, Lang-chain, OpenAI, and deployed with Heroku to simplify and explain AP material to students without access to AP courses.',
+        link: 'https://github.com/YnotCode/professor-parrot-mhacks',
     },
     {
         iconUrl: car,
@@ -247,14 +247,14 @@ export const projects = [
         theme: 'btn-back-pink',
         name: 'Word Hunt Bot',
         description: 'Created an Arduino-powered bot that holds the world record score for the game \'Word Hunt\'',
-        link: 'https://github.com/',
+        link: 'https://github.com/23jmo/WordHunt',
     },
     {
         iconUrl: estate,
         theme: 'btn-back-black',
         name: 'Medical Augmented Reality Toolkit for Visualization and Interaction',
         description: 'Pioneered a medical augmented reality interaction and visualization application using Unity, C#, Photon Fusion, OpenAI, and Microsoft Azure Speech Cognition Services for surgical application.',
-        link: 'https://github.com/',
+        link: '',
     },
     // {
     //     iconUrl: summiz,

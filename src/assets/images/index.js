@@ -5,6 +5,10 @@ import starbucks from './starbucks.png'
 import tesla from './tesla.png'
 import logo from './logo.svg'
 import me from './me.jpeg'
+import mayahdesign from './mayahdesign.png'
+import nih from './nih.png'
+import stanford from './stanford.png'
+import umich from './umich.png'
 
 export {
     hero,
@@ -13,5 +17,9 @@ export {
     starbucks,
     tesla,
     logo,
-    me
+    me,
+    mayahdesign,
+    nih,
+    stanford,
+    umich
 }
