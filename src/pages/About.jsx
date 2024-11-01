@@ -1,6 +1,8 @@
 import React from 'react'
 import { skills, experiences } from '../constants'
 
+import { me } from '../assets/images'
+
 import { VerticalTimeline, VerticalTimelineElement }  from 'react-vertical-timeline-component';
 import 'react-vertical-timeline-component/style.min.css';
 import CTA from '../components/CTA';
@@ -8,6 +10,9 @@ import CTA from '../components/CTA';
 const About = () => {
   return ( //max-container ensures it takes the whole width of screen
     <section className='max-container'>
+      <div className="w-32 h-32 mb-5 rounded-full overflow-hidden border-2 border-gray-300">
+        <img src={me} alt={"Johnathan Mo"} className="w-full h-full object-cover" />
+      </div>
       <h1 className='head-text'>
         Hello, I'm <span className='blue-gradient_text font-semibold drop-shadow'>Johnathan </span>
       </h1>
@@ -38,7 +43,7 @@ const About = () => {
           Work Experience
         </h3>
           <div className='mt-5 flex flex-col gap-3 text-slate-500'>
-            <p>I've worked at a variety of labs, startups, and on personal projects.</p>
+            <p>I've worked at a variety of labs, startups, and on a plethora of personal projects.</p>
           </div>
         <div className='mt-12 flex'>
           <VerticalTimeline>

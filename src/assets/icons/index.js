@@ -26,6 +26,13 @@ import arrow from './arrow.svg'
 import contact from './contact.svg'
 import soundon from './soundon.png'
 import soundoff from './soundoff.png'
+import unity from './unity.png'
+import sql from './sql.png'
+import csharp from './csharp.png'
+import cplusplus from './c++.png'
+import java from './java.svg'
+import python from './python.png'
+import c from './c.png'
 
 export {
     css,
@@ -55,5 +62,12 @@ export {
     arrow,
     contact,
     soundon,
-    soundoff
+    soundoff,
+    java,
+    unity,
+    sql,
+    python,
+    cplusplus,
+    csharp,
+    c
 }

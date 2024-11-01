@@ -9,6 +9,8 @@ import Plane from '../models/Plane'
 import HomeInfo from '../components/HomeInfo'
 
 import sakura from '../assets/sakura.mp3'
+import lofi from '../assets/lofi.mp3'
+
 import { soundoff, soundon } from '../assets/icons'
 
 
@@ -17,7 +19,8 @@ import { soundoff, soundon } from '../assets/icons'
 
 const Home = () => {
   
-  const audioRef = useRef(new Audio(sakura))
+  const audioRef = useRef(new Audio(lofi))
+
   audioRef.current.volume = 0.4
   audioRef.current.loop = true
 

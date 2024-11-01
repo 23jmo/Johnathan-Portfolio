@@ -2,6 +2,7 @@ import { meta, shopify, starbucks, tesla } from "../assets/images";
 import {
     car,
     contact,
+    csharp,
     css,
     estate,
     express,
@@ -20,10 +21,16 @@ import {
     redux,
     sass,
     snapgram,
+    sql,
     summiz,
     tailwindcss,
     threads,
-    typescript
+    typescript,
+    c,
+    cplusplus,
+    java,
+    python,
+    unity,
 } from "../assets/icons";
 
 export const skills = [
@@ -62,11 +69,11 @@ export const skills = [
         name: "MongoDB",
         type: "Database",
     },
-    {
-        imageUrl: motion,
-        name: "Motion",
-        type: "Animation",
-    },
+    // {
+    //     imageUrl: motion,
+    //     name: "Motion",
+    //     type: "Animation",
+    // },
     {
         imageUrl: mui,
         name: "Material-UI",
@@ -87,16 +94,16 @@ export const skills = [
         name: "React",
         type: "Frontend",
     },
-    {
-        imageUrl: redux,
-        name: "Redux",
-        type: "State Management",
-    },
-    {
-        imageUrl: sass,
-        name: "Sass",
-        type: "Frontend",
-    },
+    // {
+    //     imageUrl: redux,
+    //     name: "Redux",
+    //     type: "State Management",
+    // },
+    // {
+    //     imageUrl: sass,
+    //     name: "Sass",
+    //     type: "Frontend",
+    // },
     {
         imageUrl: tailwindcss,
         name: "Tailwind CSS",
@@ -106,60 +113,91 @@ export const skills = [
         imageUrl: typescript,
         name: "TypeScript",
         type: "Frontend",
-    }
+    },
+    {
+        imageUrl: python,
+        name: "Python",
+        type: "Backend",
+    },
+    {
+        imageUrl: sql,
+        name: "SQL",
+        type: "Backend",
+    },
+    {
+        imageUrl: unity,
+        name: "Unity",
+        type: "AR/VR",
+    },
+    {
+        imageUrl: csharp,
+        name: "C#",
+        type: "Backend",
+    },
+    {
+        imageUrl: c,
+        name: "C",
+        type: "Backend",
+    },
+    {
+        imageUrl: cplusplus,
+        name: "C++",
+        type: "Backend",
+    },
+    {
+        imageUrl: java,
+        name: "Java",
+        type: "Backend",
+    },
 ];
 
 export const experiences = [
     {
-        title: "React.js Developer",
-        company_name: "Starbucks",
+        title: "Software Engineer Intern",
+        company_name: "Mayah Design",
         icon: starbucks,
         iconBg: "#accbe1",
-        date: "March 2020 - April 2021",
+        date: "August 2024 - Present",
         points: [
-            "Developing and maintaining web applications using React.js and other related technologies.",
-            "Collaborating with cross-functional teams including designers, product managers, and other developers to create high-quality products.",
+            "Developing product visualization features using React.js and other related technologies.",
+            "Collaborating with cross-functional teams including product managers, other developers, and the CEO to ship high quality code.",
             "Implementing responsive design and ensuring cross-browser compatibility.",
             "Participating in code reviews and providing constructive feedback to other developers.",
         ],
     },
     {
-        title: "React Native Developer",
-        company_name: "Tesla",
+        title: "AR/VR Software Engineering Intern",
+        company_name: "National Institutes of Health",
         icon: tesla,
         iconBg: "#fbc3bc",
-        date: "Jan 2021 - Feb 2022",
+        date: "May 2024 - August 2024",
         points: [
-            "Developing and maintaining web applications using React.js and other related technologies.",
-            "Collaborating with cross-functional teams including designers, product managers, and other developers to create high-quality products.",
-            "Implementing responsive design and ensuring cross-browser compatibility.",
-            "Participating in code reviews and providing constructive feedback to other developers.",
+            "Pioneered a medical augmented reality interaction and visualization application using Unity, C#, Photon Fusion, OpenAI, and Microsoft Azure Speech Cognition Services for surgical application.",
+            "Presented my summer project to the Scientific Director of the NIBIB as well as a team of surgeons.",
+            "Collaborated with PhD student and Principle Investigator to output meaningful contributions that would support a future thesis"
         ],
     },
     {
-        title: "Web Developer",
-        company_name: "Shopify",
+        title: "Research Assistant",
+        company_name: "University of Michigan Cai Lab",
         icon: shopify,
         iconBg: "#b7e4c7",
-        date: "Jan 2022 - Jan 2023",
+        date: "September 2023 - May 2024",
         points: [
-            "Developing and maintaining web applications using React.js and other related technologies.",
-            "Collaborating with cross-functional teams including designers, product managers, and other developers to create high-quality products.",
-            "Implementing responsive design and ensuring cross-browser compatibility.",
-            "Participating in code reviews and providing constructive feedback to other developers.",
+            "Innovated machine learning algorithm for 3D segmentation of neurons in brain scans leveraging Python, U-Net architecture, and libraries like wandb, TensorFlow, and PyTorch, leading to 50% reduction in memory usage.",
+            "Engineered a 3D flood-filling algorithm using set operations, leading to a 26x reduction in processing time.",
+            "Presented work to over 500 students and broader research community at research fair",
         ],
     },
     {
-        title: "Full stack Developer",
-        company_name: "Meta",
+        title: "Research Assistant",
+        company_name: "Stanford Optima Group",
         icon: meta,
         iconBg: "#a2d2ff",
-        date: "Jan 2023 - Present",
+        date: "May 2023 - August 2023",
         points: [
-            "Developing and maintaining web applications using React.js and other related technologies.",
-            "Collaborating with cross-functional teams including designers, product managers, and other developers to create high-quality products.",
-            "Implementing responsive design and ensuring cross-browser compatibility.",
-            "Participating in code reviews and providing constructive feedback to other developers.",
+            "Conceptualized and executed research project leveraging Google Cloud Platform, HuggingFace Transformers, Numpy, Pandas, PyTorch, and Gradio to compare effectiveness of traditional Convolutional Neural Networks against Visual Large Language Models on recognizing Glaucoma Images.",
+            "Harnessed Few-Shot Prompting, and Chain-Of-Thought prompting to improve VLLM performance by 30%.",
         ],
     },
 ];
@@ -173,12 +211,12 @@ export const socialLinks = [
     {
         name: 'GitHub',
         iconUrl: github,
-        link: 'https://github.com/YourGitHubUsername',
+        link: 'https://github.com/23jmo',
     },
     {
         name: 'LinkedIn',
         iconUrl: linkedin,
-        link: 'https://www.linkedin.com/in/YourLinkedInUsername',
+        link: 'https://www.linkedin.com/in/johnathan-mo/',
     }
 ];
 
@@ -186,43 +224,43 @@ export const projects = [
     {
         iconUrl: pricewise,
         theme: 'btn-back-red',
-        name: 'Amazon Price Tracker',
-        description: 'Developed a web application that tracks and notifies users of price changes for products on Amazon, helping users find the best deals.',
-        link: 'https://github.com/adrianhajdin/pricewise',
+        name: 'Manu.AI',
+        description: 'Innovated a B2B service that turns inconvenient traditional user manuals into interactive digital knowledgebase, allowing users to chat with the manual',
+        link: 'http://usermanuai.com',
     },
     {
         iconUrl: threads,
         theme: 'btn-back-green',
-        name: 'Full Stack Threads Clone',
-        description: 'Created a full-stack replica of the popular discussion platform "Threads," enabling users to post and engage in threaded conversations.',
-        link: 'https://github.com/adrianhajdin/threads',
+        name: 'Professor Parrot',
+        description: 'mplemented an AI-powered Advanced Placement (AP) tutoring website using Hybrid.js, Redis, Lang-chain, OpenAI, and deployed with Heroku to simplify and explain AP material to students without access to AP courses.',
+        link: '',
     },
     {
         iconUrl: car,
         theme: 'btn-back-blue',
-        name: 'Car Finding App',
-        description: 'Designed and built a mobile app for finding and comparing cars on the market, streamlining the car-buying process.',
-        link: 'https://github.com/adrianhajdin/project_next13_car_showcase',
+        name: 'Using GANs and CNNs to More Accurately Diagnose Skin Conditions',
+        description: 'Modified a version of the Pix2Pix Generative Adversarial Network (GAN) architecture and Inception v3 Convolutional Neural Network (CNN) model using Python to more accurately diagnose skin conditions; awarded 1st award at local science fair, 4th place at the California Science and Engineering Fair (CSEF)',
+        link: '',
     },
     {
         iconUrl: snapgram,
         theme: 'btn-back-pink',
-        name: 'Full Stack Instagram Clone',
-        description: 'Built a complete clone of Instagram, allowing users to share photos and connect with friends in a familiar social media environment.',
-        link: 'https://github.com/adrianhajdin/social_media_app',
+        name: 'Word Hunt Bot',
+        description: 'Created an Arduino-powered bot that holds the world record score for the game \'Word Hunt\'',
+        link: 'https://github.com/',
     },
     {
         iconUrl: estate,
         theme: 'btn-back-black',
-        name: 'Real-Estate Application',
-        description: 'Developed a web application for real estate listings, facilitating property searches and connecting buyers with sellers.',
-        link: 'https://github.com/adrianhajdin/projects_realestate',
+        name: 'Medical Augmented Reality Toolkit for Visualization and Interaction',
+        description: 'Pioneered a medical augmented reality interaction and visualization application using Unity, C#, Photon Fusion, OpenAI, and Microsoft Azure Speech Cognition Services for surgical application.',
+        link: 'https://github.com/',
     },
-    {
-        iconUrl: summiz,
-        theme: 'btn-back-yellow',
-        name: 'AI Summarizer Application',
-        description: 'App that leverages AI to automatically generate concise & informative summaries from lengthy text content, or blogs.',
-        link: 'https://github.com/adrianhajdin/project_ai_summarizer',
-    }
+    // {
+    //     iconUrl: summiz,
+    //     theme: 'btn-back-yellow',
+    //     name: 'AI Summarizer Application',
+    //     description: 'App that leverages AI to automatically generate concise & informative summaries from lengthy text content, or blogs.',
+    //     link: 'https://github.com/adrianhajdin/project_ai_summarizer',
+    // }
 ];
