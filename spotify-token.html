@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Get Spotify Refresh Token</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #1DB954; }
+        input, button {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #1DB954;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button:hover { background: #1ed760; }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 4px;
+            word-break: break-all;
+            display: none;
+        }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e9; color: #2e7d32; }
+        label { font-weight: 600; display: block; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Spotify Refresh Token Generator</h1>
+
+        <label>Client ID:</label>
+        <input type="text" id="clientId" value="cd8810f388504aecae9484455d1fef85">
+
+        <label>Client Secret:</label>
+        <input type="text" id="clientSecret" value="e96edf57eb064c95b61c4d7437eed144">
+
+        <button onclick="step1()">Step 1: Authorize with Spotify</button>
+
+        <div id="step2" style="display: none;">
+            <label>Paste the code from the URL after authorizing:</label>
+            <input type="text" id="authCode" placeholder="Paste code here">
+            <button onclick="step2()">Step 2: Get Refresh Token</button>
+        </div>
+
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        const REDIRECT_URI = 'https://example.com/callback';
+        const SCOPES = 'user-read-currently-playing user-read-recently-played';
+
+        function step1() {
+            const clientId = document.getElementById('clientId').value;
+            const url = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPES)}`;
+
+            document.getElementById('step2').style.display = 'block';
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('result').className = 'result';
+            document.getElementById('result').innerHTML = `
+                <strong>Instructions:</strong><br>
+                1. Click this link: <a href="${url}" target="_blank">Authorize with Spotify</a><br>
+                2. After authorizing, you'll be redirected to a broken page<br>
+                3. Copy the "code" parameter from the URL (everything after code= and before any &)<br>
+                4. Paste it below and click Step 2
+            `;
+        }
+
+        async function step2() {
+            const clientId = document.getElementById('clientId').value;
+            const clientSecret = document.getElementById('clientSecret').value;
+            const code = document.getElementById('authCode').value.trim();
+
+            if (!code) {
+                alert('Please paste the authorization code first');
+                return;
+            }
+
+            const result = document.getElementById('result');
+            result.style.display = 'block';
+            result.className = 'result';
+            result.textContent = 'Exchanging code for refresh token...';
+
+            try {
+                const response = await fetch('https://accounts.spotify.com/api/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Authorization': 'Basic ' + btoa(clientId + ':' + clientSecret)
+                    },
+                    body: new URLSearchParams({
+                        grant_type: 'authorization_code',
+                        code: code,
+                        redirect_uri: REDIRECT_URI
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    result.className = 'result error';
+                    result.textContent = `Error: ${data.error}\n${data.error_description || ''}`;
+                } else {
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        <strong>Success! 🎉</strong><br><br>
+                        <strong>Add this to your .env.local file:</strong><br><br>
+                        SPOTIFY_CLIENT_ID=${clientId}<br>
+                        SPOTIFY_CLIENT_SECRET=${clientSecret}<br>
+                        SPOTIFY_REFRESH_TOKEN=${data.refresh_token}<br><br>
+                        <small>Access token (valid 1hr): ${data.access_token}</small>
+                    `;
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.textContent = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
