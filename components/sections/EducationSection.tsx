@@ -8,6 +8,7 @@ export default function EducationSection() {
       src: education[0].logo,
       alt: education[0].school,
       tooltipText: `${education[0].school} — ${education[0].gpa} GPA`,
+      href: education[0].link,
     },
   ];
 
@@ -16,6 +17,8 @@ export default function EducationSection() {
       src: education[1].logo,
       alt: education[1].school,
       tooltipText: `${education[1].school} — ${education[1].gpa} GPA`,
+      href: education[1].link,
+      scale: 0.7,
     },
   ];
 

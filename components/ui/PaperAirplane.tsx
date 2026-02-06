@@ -7,8 +7,8 @@ export default function PaperAirplane() {
   const stateRef = useRef({
     x: 0,
     y: 0,
-    vx: 0.5,
-    vy: 0.35,
+    vx: 1.0,
+    vy: 0.7,
     angle: 0,
     mouseX: -1000,
     mouseY: -1000,

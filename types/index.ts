@@ -4,6 +4,7 @@ export interface Experience {
   logo: string;
   date: string;
   description: string;
+  link?: string;
 }
 
 export interface Project {
@@ -21,6 +22,7 @@ export interface Education {
   degree: string;
   gpa: string;
   date: string;
+  link?: string;
 }
 
 export interface SocialLink {

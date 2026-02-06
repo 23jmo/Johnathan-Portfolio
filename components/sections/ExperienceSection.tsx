@@ -7,6 +7,7 @@ export default function ExperienceSection() {
     src: exp.logo,
     alt: exp.company,
     tooltipText: `${exp.title} @ ${exp.company}`,
+    href: exp.link,
   }));
 
   return (

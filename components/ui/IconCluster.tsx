@@ -11,6 +11,7 @@ export interface IconClusterItem {
   fallbackLetter?: string;
   fallbackColor?: string;
   noRotation?: boolean;
+  scale?: number;
 }
 
 interface IconClusterProps {
@@ -95,7 +96,8 @@ export function IconCluster({
                   alt={item.alt}
                   width={size}
                   height={size}
-                  className="dark:invert w-full h-full object-cover"
+                  className="w-full h-full object-cover"
+                  style={item.scale ? { transform: `scale(${item.scale})` } : undefined}
                 />
               </span>
             ) : (
