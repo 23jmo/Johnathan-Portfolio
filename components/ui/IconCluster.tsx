@@ -12,6 +12,7 @@ export interface IconClusterItem {
   fallbackColor?: string;
   noRotation?: boolean;
   scale?: number;
+  backgroundColor?: string;
 }
 
 interface IconClusterProps {
@@ -79,6 +80,7 @@ export function IconCluster({
                   width: `${size}px`,
                   height: `${size}px`,
                   transform: item.noRotation ? "rotate(0deg)" : `rotate(${rotation}deg)`,
+                  backgroundColor: item.backgroundColor || "transparent",
                 }}
                 onMouseEnter={(e) => {
                   if (!item.noRotation) {

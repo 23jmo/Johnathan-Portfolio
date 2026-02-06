@@ -3,8 +3,8 @@ import HeroSection from "@/components/sections/HeroSection";
 import ExperienceSection from "@/components/sections/ExperienceSection";
 import ProjectsSection from "@/components/sections/ProjectsSection";
 import EducationSection from "@/components/sections/EducationSection";
-import AwardsSection from "@/components/sections/AwardsSection";
-import YouTubeSection from "@/components/sections/YouTubeSection";
+// import AwardsSection from "@/components/sections/AwardsSection";
+// import YouTubeSection from "@/components/sections/YouTubeSection";
 import SocialsSection from "@/components/sections/SocialsSection";
 import BlogPreviewSection from "@/components/sections/BlogPreviewSection";
 import CTAFooter from "@/components/sections/CTAFooter";
@@ -17,8 +17,8 @@ export default function Home() {
       <ExperienceSection />
       <ProjectsSection />
       <EducationSection />
-      <AwardsSection />
-      <YouTubeSection />
+      {/* <AwardsSection /> */}
+      {/* <YouTubeSection /> */}
       <SocialsSection />
       <BlogPreviewSection />
       <CTAFooter />

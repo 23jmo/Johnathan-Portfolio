@@ -21,7 +21,7 @@ export const experiences: Experience[] = [
   {
     title: "Research Assistant",
     company: "CGUI Lab",
-    logo: "/images/logos/cgui.svg",
+    logo: "/images/logos/columbia.svg",
     date: "2024 – Present",
     description:
       "Columbia University Computer Graphics & User Interfaces Lab — researching novel interaction techniques.",
@@ -44,6 +44,8 @@ export const experiences: Experience[] = [
     description:
       "Innovated ML algorithm for 3D neuron segmentation — 50% memory reduction and 26x faster processing. Presented to 500+ students at research fair.",
     link: "https://umich.edu",
+    logoScale: 0.5,
+    logoBackground: "white",
   },
   {
     title: "Research Assistant",
@@ -100,7 +102,7 @@ export const projects: Project[] = [
 
 export const education: Education[] = [
   {
-    school: "Columbia University",
+    school: "Columbia",
     logo: "/images/logos/columbia.svg",
     degree: "CS",
     gpa: "3.95 / 4.0",
@@ -108,12 +110,14 @@ export const education: Education[] = [
     link: "https://columbia.edu",
   },
   {
-    school: "University of Michigan",
+    school: "U-M",
     logo: "/images/logos/umich.png",
     degree: "B.E. (Transferred)",
     gpa: "4.00 / 4.0",
     date: "2022 – 2024",
     link: "https://umich.edu",
+    logoBackground: "white",
+    logoScale: 0.5,
   },
 ];
 
@@ -121,6 +125,22 @@ export const awards: Award[] = [
   {
     title: "TreeHacks 2025 Winner",
     description: "",
+    icon: "/icons/treehacks.svg",
+  },
+  {
+    title: "Perfect PSAT",
+    description: "",
+    icon: "/icons/psat.svg",
+  },
+  {
+    title: "Perfect ACT",
+    description: "",
+    icon: "/icons/act.svg",
+  },
+  {
+    title: "AFORE Grant Fellow",
+    description: "",
+    icon: "/icons/afore.svg",
   },
 ];
 

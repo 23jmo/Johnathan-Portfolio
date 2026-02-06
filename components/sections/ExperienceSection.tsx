@@ -8,6 +8,8 @@ export default function ExperienceSection() {
     alt: exp.company,
     tooltipText: `${exp.title} @ ${exp.company}`,
     href: exp.link,
+    scale: exp.logoScale,
+    backgroundColor: exp.logoBackground,
   }));
 
   return (
@@ -16,7 +18,7 @@ export default function ExperienceSection() {
         <p className="text-xl leading-relaxed text-foreground/90">
           I&apos;ve built software across{" "}
           <IconCluster items={clusterItems} /> research labs, startups, and big
-          tech.
+          tech, and quant.
         </p>
       </section>
     </FadeInOnScroll>

@@ -1,4 +1,4 @@
-import { education } from "@/lib/content";
+import { education, youtubeChannel } from "@/lib/content";
 import { IconCluster } from "@/components/ui/IconCluster";
 import FadeInOnScroll from "@/components/ui/FadeInOnScroll";
 
@@ -18,7 +18,17 @@ export default function EducationSection() {
       alt: education[1].school,
       tooltipText: `${education[1].school} — ${education[1].gpa} GPA`,
       href: education[1].link,
-      scale: 0.6,
+      scale: education[1].logoScale,
+      backgroundColor: education[1].logoBackground,
+    },
+  ];
+
+  const youtubeIcon = [
+    {
+      src: "/icons/youtube.svg",
+      alt: "YouTube",
+      tooltipText: "YouTube",
+      href: youtubeChannel,
     },
   ];
 
@@ -26,11 +36,10 @@ export default function EducationSection() {
     <FadeInOnScroll>
       <section>
         <p className="text-xl leading-relaxed text-foreground/90">
-          I&apos;m studying <IconCluster items={columbiaIcon} />
-          <strong>{education[0].degree}</strong> at{" "}
-          <strong>{education[0].school}</strong>.
-          Previously at <IconCluster items={umichIcon} />
-          <strong>{education[1].school}</strong>.
+          I&apos;m studying <strong>{education[0].degree}</strong> at{" "}
+          <strong>{education[0].school}</strong> <IconCluster items={columbiaIcon} />,
+          previously at <strong>{education[1].school}</strong> <IconCluster items={umichIcon} />,
+          and I make videos about CS, projects, and college life <IconCluster items={youtubeIcon} />.
         </p>
       </section>
     </FadeInOnScroll>

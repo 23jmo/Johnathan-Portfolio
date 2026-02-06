@@ -5,6 +5,8 @@ export interface Experience {
   date: string;
   description: string;
   link?: string;
+  logoScale?: number;
+  logoBackground?: string;
 }
 
 export interface Project {
@@ -23,6 +25,8 @@ export interface Education {
   gpa: string;
   date: string;
   link?: string;
+  logoBackground?: string;
+  logoScale?: number;
 }
 
 export interface SocialLink {
@@ -34,6 +38,7 @@ export interface SocialLink {
 export interface Award {
   title: string;
   description: string;
+  icon?: string;
 }
 
 export interface BlogPost {
