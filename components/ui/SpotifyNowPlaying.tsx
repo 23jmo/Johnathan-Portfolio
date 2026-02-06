@@ -324,37 +324,32 @@ export default function SpotifyNowPlaying() {
               )}
             </motion.div>
 
-            {/* Sound bars - persistent, animated position */}
-            {current.isPlaying ? (
+            {/* Sound bars - inline in pill, absolute in expanded */}
+            {current.isPlaying && !expanded && (
+              <div className="ml-3 shrink-0">
+                <SoundBars dark={isDark} />
+              </div>
+            )}
+
+            {!current.isPlaying && !expanded && (
+              <span className={`text-[10px] ml-3 ${pausedText}`}>
+                paused
+              </span>
+            )}
+
+            {/* Sound bars top-right when expanded */}
+            {current.isPlaying && (
               <motion.div
+                className="absolute top-3 right-3"
                 animate={{
-                  position: expanded ? "absolute" : "relative",
-                  top: expanded ? 12 : "auto",
-                  right: expanded ? 12 : "auto",
-                  marginLeft: expanded ? 0 : 12,
+                  opacity: expanded ? 1 : 0,
+                  scale: expanded ? 1 : 0.8,
                 }}
                 transition={springTransition}
+                style={{ pointerEvents: expanded ? "auto" : "none" }}
               >
-                <motion.div
-                  animate={{
-                    scale: expanded ? 0.75 : 1,
-                  }}
-                  transition={springTransition}
-                >
-                  <SoundBars small={expanded} dark={isDark} />
-                </motion.div>
+                <SoundBars small dark={isDark} />
               </motion.div>
-            ) : (
-              !expanded && (
-                <motion.span
-                  className={`text-[10px] ml-3 ${pausedText}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  paused
-                </motion.span>
-              )
             )}
           </div>
         </motion.div>
