@@ -40,6 +40,15 @@ Required in `.env.local` (see `.env.example`):
 - `SPOTIFY_CLIENT_SECRET`
 - `SPOTIFY_REFRESH_TOKEN`
 
+## Deployment
+- **Always run Vercel deployments in the background** using the Task tool with `run_in_background: true`
+- This prevents blocking the workflow while waiting for builds to complete
+- Example:
+  ```
+  Task(subagent_type: "Bash", description: "Deploy to Vercel production",
+       prompt: "vercel --prod --yes", run_in_background: true)
+  ```
+
 ## Constraints
 - Do not run `npm run dev` or `npm start` without being asked
 - Confirm absolute file paths before any write operations
