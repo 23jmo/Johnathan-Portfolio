@@ -1,0 +1,8 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="48" height="48" fill="white" rx="24"/>
+  <g transform="translate(8, 12)">
+    <!-- NIH Chevron Icon -->
+    <path d="M0 0h24l8 12-8 12H0l8-12L0 0z" fill="#20558A"/>
+    <path d="M20 2l6 10-6 10h-2l6-10-6-10h2z" fill="#4A90E2"/>
+  </g>
+</svg>

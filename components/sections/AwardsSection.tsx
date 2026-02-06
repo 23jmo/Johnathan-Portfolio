@@ -9,7 +9,8 @@ export default function AwardsSection() {
           {awards.map((award, index) => (
             <span key={award.title}>
               {index > 0 && " "}
-              <strong>{award.title}</strong> ({award.description})
+              <strong>{award.title}</strong>
+              {award.description && ` (${award.description})`}
               {index < awards.length - 1 ? "," : "."}
             </span>
           ))}

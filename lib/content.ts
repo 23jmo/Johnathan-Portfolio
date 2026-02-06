@@ -30,7 +30,7 @@ export const experiences: Experience[] = [
   {
     title: "AR/VR SWE Intern",
     company: "NIH",
-    logo: "/images/logos/nih.png",
+    logo: "/images/logos/nih.svg",
     date: "May 2024 – Aug 2024",
     description:
       "Pioneered a medical AR interaction and visualization application using Unity, C#, Photon Fusion, OpenAI, and Azure Speech Services for surgical application. Presented to the NIBIB Scientific Director and a team of surgeons.",

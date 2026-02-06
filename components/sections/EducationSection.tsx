@@ -18,7 +18,7 @@ export default function EducationSection() {
       alt: education[1].school,
       tooltipText: `${education[1].school} — ${education[1].gpa} GPA`,
       href: education[1].link,
-      scale: 0.7,
+      scale: 0.6,
     },
   ];
 

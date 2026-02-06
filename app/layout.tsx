@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Johnathan Mo",
     description:
-      "CS student at Columbia University. Building software across research labs, startups, and big tech.",
+      "CS student at Columbia University. Building software across research labs, startups, bit tech, and quant.",
   },
 };
 
