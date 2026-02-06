@@ -181,7 +181,7 @@ export default function SpotifyNowPlaying() {
           onClick={() => setExpanded(!expanded)}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
-          className="cursor-pointer select-none overflow-hidden shadow-2xl spotify-glass-dock"
+          className="cursor-pointer select-none overflow-visible shadow-2xl spotify-glass-dock relative"
           style={{
             background: dockBg,
             backdropFilter: "blur(12px) saturate(1.4)",
@@ -200,134 +200,163 @@ export default function SpotifyNowPlaying() {
           }}
           transition={springTransition}
         >
-          <AnimatePresence mode="wait" initial={false}>
-            {expanded ? (
-              /* ========== EXPANDED MODE ========== */
-              <motion.div
-                key="expanded"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
-                className="flex items-center gap-3.5 relative p-3"
-                style={{ height: "100%" }}
-              >
-                {/* Album art */}
-                {current.albumImageUrl && !imgError ? (
+          <div className="flex items-center relative" style={{ height: "100%", padding: expanded ? "12px" : "0 12px" }}>
+            {/* Album art - persistent, animated */}
+            <motion.div
+              className="shrink-0 overflow-hidden"
+              animate={{
+                width: expanded ? 72 : 32,
+                height: expanded ? 72 : 32,
+                borderRadius: expanded ? 12 : 16,
+              }}
+              transition={springTransition}
+              style={{ backgroundColor: artBg }}
+            >
+              {current.albumImageUrl && !imgError ? (
+                current.songUrl && expanded ? (
                   <a
                     href={current.songUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="shrink-0 block"
+                    className="block w-full h-full"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="w-[72px] h-[72px] rounded-xl overflow-hidden shadow-lg" style={{ backgroundColor: artBg }}>
-                      <img src={current.albumImageUrl} alt="" className="w-full h-full object-cover" onError={() => setImgError(true)} />
-                    </div>
+                    <img src={current.albumImageUrl} alt="" className="w-full h-full object-cover" onError={() => setImgError(true)} />
                   </a>
                 ) : (
-                  <div className="w-[72px] h-[72px] rounded-xl flex items-center justify-center shrink-0 shadow-lg" style={{ backgroundColor: artBg }}>
-                    <MusicIcon size={24} dark={isDark} />
-                  </div>
-                )}
-
-                {/* Song info */}
-                <div className="flex flex-col min-w-0 flex-1 gap-0.5">
-                  <div className="flex items-center gap-1.5">
-                    {current.isPlaying && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#1DB954] spotify-pulse shrink-0" />
-                    )}
-                    <span className={`text-[9px] uppercase tracking-widest leading-none ${textMuted}`}>
-                      {current.isPlaying ? "Jmo is listening to" : "Recently played"}
-                    </span>
-                  </div>
-
-                  {current.songUrl ? (
-                    <a
-                      href={current.songUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`text-sm font-semibold truncate hover:opacity-80 transition-colors leading-snug ${textPrimary}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {current.title}
-                    </a>
-                  ) : (
-                    <span className={`text-sm font-semibold truncate leading-snug ${textPrimary}`}>
-                      {current.title}
-                    </span>
-                  )}
-
-                  <span className={`text-xs truncate leading-tight ${textSecondary}`}>
-                    {current.artist}
-                  </span>
-
-                  {duration > 0 && (
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <div className={`flex-1 h-[3px] rounded-full overflow-hidden ${progressTrack}`}>
-                        <div
-                          className={`h-full rounded-full ${progressFill}`}
-                          style={{
-                            width: `${Math.min(progressPercent, 100)}%`,
-                            transition: "width 1s linear",
-                          }}
-                        />
-                      </div>
-                      <span className={`text-[9px] tabular-nums shrink-0 ${textFaint}`}>
-                        {formatTime(progress)}/{formatTime(duration)}
-                      </span>
-                    </div>
-                  )}
+                  <img src={current.albumImageUrl} alt="" className="w-full h-full object-cover" onError={() => setImgError(true)} />
+                )
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <MusicIcon size={expanded ? 24 : 14} dark={isDark} />
                 </div>
+              )}
+            </motion.div>
 
-                {/* Sound bars — top right */}
-                {current.isPlaying && (
-                  <div className="absolute top-3 right-3">
-                    <SoundBars small dark={isDark} />
-                  </div>
-                )}
-              </motion.div>
-            ) : (
-              /* ========== PILL MODE ========== */
+            {/* Content - persistent text with animated properties */}
+            <motion.div
+              className="flex flex-col min-w-0 flex-1"
+              animate={{
+                marginLeft: expanded ? 14 : 12,
+              }}
+              transition={springTransition}
+            >
+              {/* Status line - only in expanded */}
               <motion.div
-                key="pill"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12 }}
-                className="flex items-center gap-3 px-3"
-                style={{ height: "100%" }}
+                className="flex items-center gap-1.5 overflow-hidden"
+                animate={{
+                  height: expanded ? "auto" : 0,
+                  opacity: expanded ? 1 : 0,
+                  marginBottom: expanded ? 2 : 0,
+                }}
+                transition={springTransition}
               >
-                {/* Tiny album art */}
-                {current.albumImageUrl && !imgError ? (
-                  <div className="w-8 h-8 rounded-full overflow-hidden shrink-0" style={{ backgroundColor: artBg }}>
-                    <img src={current.albumImageUrl} alt="" className="w-full h-full object-cover" onError={() => setImgError(true)} />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: artBg }}>
-                    <MusicIcon size={14} dark={isDark} />
-                  </div>
+                {current.isPlaying && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#1DB954] spotify-pulse shrink-0" />
                 )}
+                <span className={`text-[9px] uppercase tracking-widest leading-none whitespace-nowrap ${textMuted}`}>
+                  {current.isPlaying ? "Jmo is listening to" : "Recently played"}
+                </span>
+              </motion.div>
 
-                {/* Song title + artist */}
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className={`text-[12px] font-medium truncate leading-tight ${textPrimary}`}>
+              {/* Song title */}
+              <motion.div
+                animate={{
+                  fontSize: expanded ? 14 : 12,
+                  lineHeight: expanded ? 1.3 : 1.2,
+                }}
+                transition={springTransition}
+                className="truncate"
+              >
+                {current.songUrl && expanded ? (
+                  <a
+                    href={current.songUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`font-semibold hover:opacity-80 transition-colors ${textPrimary}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {current.title}
+                  </a>
+                ) : (
+                  <span className={`font-semibold ${textPrimary}`}>
                     {current.title}
                   </span>
-                  <span className={`text-[10px] truncate leading-tight ${textMuted}`}>
-                    {current.artist}
-                  </span>
-                </div>
-
-                {/* Sound bars — vertically centered */}
-                {current.isPlaying ? (
-                  <SoundBars dark={isDark} />
-                ) : (
-                  <span className={`text-[10px] ${pausedText}`}>paused</span>
                 )}
               </motion.div>
+
+              {/* Artist */}
+              <motion.div
+                className={`truncate ${expanded ? textSecondary : textMuted}`}
+                animate={{
+                  fontSize: expanded ? 12 : 10,
+                  lineHeight: expanded ? 1.3 : 1.2,
+                }}
+                transition={springTransition}
+              >
+                {current.artist}
+              </motion.div>
+
+              {/* Progress bar - only in expanded */}
+              {duration > 0 && (
+                <motion.div
+                  className="flex items-center gap-2 overflow-hidden"
+                  animate={{
+                    height: expanded ? "auto" : 0,
+                    opacity: expanded ? 1 : 0,
+                    marginTop: expanded ? 6 : 0,
+                  }}
+                  transition={springTransition}
+                >
+                  <div className={`flex-1 h-[3px] rounded-full overflow-hidden ${progressTrack}`}>
+                    <div
+                      className={`h-full rounded-full ${progressFill}`}
+                      style={{
+                        width: `${Math.min(progressPercent, 100)}%`,
+                        transition: "width 1s linear",
+                      }}
+                    />
+                  </div>
+                  <span className={`text-[9px] tabular-nums shrink-0 ${textFaint}`}>
+                    {formatTime(progress)}/{formatTime(duration)}
+                  </span>
+                </motion.div>
+              )}
+            </motion.div>
+
+            {/* Sound bars - persistent, animated position */}
+            {current.isPlaying ? (
+              <motion.div
+                animate={{
+                  position: expanded ? "absolute" : "relative",
+                  top: expanded ? 12 : "auto",
+                  right: expanded ? 12 : "auto",
+                  marginLeft: expanded ? 0 : 12,
+                }}
+                transition={springTransition}
+              >
+                <motion.div
+                  animate={{
+                    scale: expanded ? 0.75 : 1,
+                  }}
+                  transition={springTransition}
+                >
+                  <SoundBars small={expanded} dark={isDark} />
+                </motion.div>
+              </motion.div>
+            ) : (
+              !expanded && (
+                <motion.span
+                  className={`text-[10px] ml-3 ${pausedText}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  paused
+                </motion.span>
+              )
             )}
-          </AnimatePresence>
+          </div>
         </motion.div>
       </div>
     </>
