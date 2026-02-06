@@ -1,4 +1,19 @@
-<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="20" cy="20" r="20" fill="#0369A1"/>
-  <text x="20" y="27" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="600" fill="white" text-anchor="middle">C</text>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="48" height="48" rx="24" fill="white"/>
+  <!-- Columbia Crown Logo -->
+  <g transform="translate(10, 12) scale(0.045)">
+    <!-- Crown base bar -->
+    <rect x="50" y="350" width="500" height="40" fill="#003c71"/>
+    <!-- Crown body -->
+    <path d="M100 350 L100 250 Q100 180 150 150 L250 200 L350 150 Q400 180 400 250 L400 350" fill="#003c71"/>
+    <!-- Crown top ornament -->
+    <circle cx="250" cy="120" r="30" fill="#003c71"/>
+    <rect x="235" y="80" width="30" height="50" fill="#003c71"/>
+    <!-- Crown crosses -->
+    <path d="M235 70 L265 70 M250 55 L250 85" stroke="#003c71" stroke-width="15"/>
+    <path d="M170 180 L200 180 M185 165 L185 195" stroke="white" stroke-width="12"/>
+    <path d="M300 180 L330 180 M315 165 L315 195" stroke="white" stroke-width="12"/>
+    <!-- Crown arches -->
+    <path d="M150 250 Q180 200 250 170 Q320 200 350 250" stroke="#003c71" stroke-width="25" fill="none"/>
+  </g>
 </svg>

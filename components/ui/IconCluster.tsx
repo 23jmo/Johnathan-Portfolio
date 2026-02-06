@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 
 export interface IconClusterItem {
@@ -10,6 +10,7 @@ export interface IconClusterItem {
   href?: string;
   fallbackLetter?: string;
   fallbackColor?: string;
+  noRotation?: boolean;
 }
 
 interface IconClusterProps {
@@ -24,6 +25,17 @@ export function IconCluster({
   overlapOffset = -10,
 }: IconClusterProps) {
   const [isSpread, setIsSpread] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Generate random rotations for each icon (between -5 and 5 degrees)
+  const rotations = useMemo(
+    () => items.map(() => Math.random() * 10 - 5),
+    [items]
+  );
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   return (
     <span
@@ -37,6 +49,7 @@ export function IconCluster({
         const marginLeft =
           index === 0 ? 0 : isSpread ? 4 : overlapOffset;
         const zIndex = items.length - index;
+        const rotation = isMounted && !item.noRotation ? rotations[index] : 0;
 
         const IconWrapper = item.href ? "a" : "span";
         const wrapperProps = item.href
@@ -59,21 +72,51 @@ export function IconCluster({
             {...wrapperProps}
           >
             {item.src ? (
-              <Image
-                src={item.src}
-                alt={item.alt}
-                width={size}
-                height={size}
-                className="rounded-full border-2 border-background dark:border-background dark:invert object-cover"
-              />
+              <span
+                className="block rounded-full border-2 border-background dark:border-background overflow-hidden transition-transform duration-300"
+                style={{
+                  width: `${size}px`,
+                  height: `${size}px`,
+                  transform: item.noRotation ? "rotate(0deg)" : `rotate(${rotation}deg)`,
+                }}
+                onMouseEnter={(e) => {
+                  if (!item.noRotation) {
+                    e.currentTarget.style.transform = "rotate(0deg)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!item.noRotation) {
+                    e.currentTarget.style.transform = `rotate(${rotation}deg)`;
+                  }
+                }}
+              >
+                <Image
+                  src={item.src}
+                  alt={item.alt}
+                  width={size}
+                  height={size}
+                  className="dark:invert w-full h-full object-cover"
+                />
+              </span>
             ) : (
               <span
-                className="rounded-full border-2 border-background dark:border-background inline-flex items-center justify-center font-semibold text-white"
+                className="rounded-full border-2 border-background dark:border-background inline-flex items-center justify-center font-semibold text-white transition-transform duration-300"
                 style={{
                   width: `${size}px`,
                   height: `${size}px`,
                   backgroundColor: item.fallbackColor || "#3B82F6",
                   fontSize: `${Math.floor(size * 0.5)}px`,
+                  transform: item.noRotation ? "rotate(0deg)" : `rotate(${rotation}deg)`,
+                }}
+                onMouseEnter={(e) => {
+                  if (!item.noRotation) {
+                    e.currentTarget.style.transform = "rotate(0deg)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!item.noRotation) {
+                    e.currentTarget.style.transform = `rotate(${rotation}deg)`;
+                  }
                 }}
               >
                 {item.fallbackLetter || "?"}

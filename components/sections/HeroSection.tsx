@@ -1,8 +1,16 @@
-import Image from "next/image";
 import { IconCluster } from "@/components/ui/IconCluster";
 import FadeInOnScroll from "@/components/ui/FadeInOnScroll";
 
 export default function HeroSection() {
+  const avatarIcon = [
+    {
+      src: "/images/avatar.jpeg",
+      alt: "Johnathan Mo",
+      tooltipText: "Johnathan Mo",
+      noRotation: true,
+    },
+  ];
+
   const columbiaIcon = [
     {
       src: "/images/logos/columbia.svg",
@@ -15,15 +23,7 @@ export default function HeroSection() {
     <FadeInOnScroll>
       <section className="space-y-6">
         <h1 className="text-3xl sm:text-4xl leading-snug tracking-tight">
-          Hi, I&apos;m{" "}
-          <Image
-            src="/images/avatar.jpeg"
-            alt="Johnathan Mo"
-            width={48}
-            height={48}
-            className="inline-block rounded-full align-middle mx-1"
-            priority
-          />{" "}
+          Hi, I&apos;m <IconCluster items={avatarIcon} size={48} />{" "}
           <strong>Johnathan Mo</strong>{" "}
           <span className="text-muted">(Jmo)</span>.
         </h1>

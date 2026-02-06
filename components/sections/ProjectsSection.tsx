@@ -8,7 +8,7 @@ export default function ProjectsSection() {
   const clusterItems = projects.map((project, index) => ({
     src: project.logo || undefined,
     alt: project.name,
-    tooltipText: project.name,
+    tooltipText: `${project.name} — ${project.description}`,
     href: project.link || undefined,
     fallbackLetter: project.logo ? undefined : project.name[0].toUpperCase(),
     fallbackColor: project.logo

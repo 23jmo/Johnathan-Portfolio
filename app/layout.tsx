@@ -3,6 +3,7 @@ import { ThemeProvider } from "next-themes";
 import { figtree } from "@/lib/fonts";
 import CustomCursor from "@/components/ui/CustomCursor";
 import ScrollProgress from "@/components/ui/ScrollProgress";
+import PaperAirplane from "@/components/ui/PaperAirplane";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -39,6 +40,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange={false}
         >
+          <PaperAirplane />
           <ScrollProgress />
           <CustomCursor />
           {children}

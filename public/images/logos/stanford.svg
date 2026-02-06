@@ -1,5 +1,9 @@
 <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="24" cy="24" r="22" fill="#8C1515" stroke="#8C1515" stroke-width="2"/>
-  <path d="M24 12l-8 6v8l8 6 8-6v-8l-8-6z" fill="white"/>
-  <text x="24" y="28" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="700" fill="white" text-anchor="middle">S</text>
+  <rect width="48" height="48" rx="24" fill="white"/>
+  <g transform="translate(6, 6) scale(0.09)">
+    <path d="M200 0C89.543 0 0 89.543 0 200s89.543 200 200 200 200-89.543 200-200S310.457 0 200 0zm0 366.667C110.457 366.667 33.333 289.543 33.333 200S110.457 33.333 200 33.333 366.667 110.457 366.667 200 289.543 366.667 200 366.667z" fill="#8C1515"/>
+    <path d="M200 66.667c-73.638 0-133.333 59.695-133.333 133.333S126.362 333.333 200 333.333 333.333 273.638 333.333 200 273.638 66.667 200 66.667zm0 233.333c-55.228 0-100-44.772-100-100s44.772-100 100-100 100 44.772 100 100-44.772 100-100 100z" fill="#8C1515"/>
+    <path d="M180 280h40v-40h-40v40zm0-60h40v-80h-40v80z" fill="#2F7C31"/>
+    <path d="M200 120l-20 20v100l20-20 20 20V140l-20-20z" fill="#2F7C31"/>
+  </g>
 </svg>
