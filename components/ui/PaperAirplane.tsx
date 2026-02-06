@@ -7,8 +7,8 @@ export default function PaperAirplane() {
   const stateRef = useRef({
     x: 0,
     y: 0,
-    vx: 0.3,
-    vy: 0.2,
+    vx: 0.5,
+    vy: 0.35,
     angle: 0,
     mouseX: -1000,
     mouseY: -1000,
@@ -63,7 +63,7 @@ export default function PaperAirplane() {
 
     // Clamp speed
     const speed = Math.sqrt(s.vx * s.vx + s.vy * s.vy);
-    const maxSpeed = 1.2;
+    const maxSpeed = 1.8;
     if (speed > maxSpeed) {
       s.vx = (s.vx / speed) * maxSpeed;
       s.vy = (s.vy / speed) * maxSpeed;
@@ -100,46 +100,77 @@ export default function PaperAirplane() {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw contrail
+    // Draw cartoony gray contrail with dashed puffs
     if (s.trail.length > 2) {
-      ctx.beginPath();
-      ctx.moveTo(s.trail[0].x, s.trail[0].y);
-      for (let i = 1; i < s.trail.length; i++) {
-        ctx.lineTo(s.trail[i].x, s.trail[i].y);
+      for (let i = 0; i < s.trail.length - 1; i++) {
+        const t = i / s.trail.length;
+        const alpha = (1 - t) * 0.35;
+        const width = (1 - t) * 6 + 2;
+
+        ctx.beginPath();
+        ctx.moveTo(s.trail[i].x, s.trail[i].y);
+        ctx.lineTo(s.trail[i + 1].x, s.trail[i + 1].y);
+        ctx.strokeStyle = `rgba(160, 160, 160, ${alpha})`;
+        ctx.lineWidth = width;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.setLineDash([4, 6]);
+        ctx.stroke();
       }
-      ctx.strokeStyle = "rgba(120, 160, 255, 0.12)";
-      ctx.lineWidth = 2;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
-    // Draw paper airplane
+    // Draw paper airplane (bigger and more detailed)
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.rotate(s.angle);
 
-    // Main body
+    const scale = 1.5;
+
+    // Main wing body (top)
     ctx.beginPath();
-    ctx.moveTo(14, 0);
-    ctx.lineTo(-10, -8);
-    ctx.lineTo(-4, 0);
-    ctx.lineTo(-10, 8);
+    ctx.moveTo(20 * scale, 0);
+    ctx.lineTo(-14 * scale, -10 * scale);
+    ctx.lineTo(-6 * scale, 0);
     ctx.closePath();
-    ctx.fillStyle = "#6BA4E7";
+    ctx.fillStyle = "#7DB3E8";
     ctx.fill();
+    ctx.strokeStyle = "#4A88D0";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Main wing body (bottom)
+    ctx.beginPath();
+    ctx.moveTo(20 * scale, 0);
+    ctx.lineTo(-14 * scale, 10 * scale);
+    ctx.lineTo(-6 * scale, 0);
+    ctx.closePath();
+    ctx.fillStyle = "#5A9FDB";
+    ctx.fill();
+    ctx.strokeStyle = "#4A88D0";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Center fold line
+    ctx.beginPath();
+    ctx.moveTo(20 * scale, 0);
+    ctx.lineTo(-14 * scale, 0);
     ctx.strokeStyle = "#3D7AC7";
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Bottom fold shadow
+    // Wing details (creases)
     ctx.beginPath();
-    ctx.moveTo(14, 0);
-    ctx.lineTo(-4, 0);
-    ctx.lineTo(-10, 8);
-    ctx.closePath();
-    ctx.fillStyle = "#4A88D0";
-    ctx.fill();
+    ctx.moveTo(-6 * scale, 0);
+    ctx.lineTo(-10 * scale, -6 * scale);
+    ctx.strokeStyle = "#4A88D0";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(-6 * scale, 0);
+    ctx.lineTo(-10 * scale, 6 * scale);
+    ctx.stroke();
 
     ctx.restore();
 

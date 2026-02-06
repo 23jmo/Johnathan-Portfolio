@@ -2,7 +2,7 @@ const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 const SPOTIFY_NOW_PLAYING_URL =
   "https://api.spotify.com/v1/me/player/currently-playing";
 const SPOTIFY_RECENTLY_PLAYED_URL =
-  "https://api.spotify.com/v1/me/player/recently-played?limit=1";
+  "https://api.spotify.com/v1/me/player/recently-played?limit=2";
 
 async function getAccessToken(): Promise<string | null> {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
@@ -31,10 +31,34 @@ async function getAccessToken(): Promise<string | null> {
   return data.access_token ?? null;
 }
 
+function extractTrack(
+  track: Record<string, unknown>,
+  isPlaying: boolean,
+  progressMs?: number
+) {
+  const item = track as {
+    name: string;
+    duration_ms: number;
+    artists: { name: string }[];
+    album: { images: { url: string }[] };
+    external_urls: { spotify: string };
+  };
+
+  return {
+    isPlaying,
+    title: item.name,
+    artist: item.artists.map((a) => a.name).join(", "),
+    albumImageUrl: item.album.images?.[0]?.url,
+    songUrl: item.external_urls?.spotify,
+    progressMs: progressMs ?? 0,
+    durationMs: item.duration_ms ?? 0,
+  };
+}
+
 export async function getNowPlaying() {
   const accessToken = await getAccessToken();
   if (!accessToken) {
-    return { isPlaying: false };
+    return { current: { isPlaying: false } };
   }
 
   try {
@@ -43,54 +67,69 @@ export async function getNowPlaying() {
     });
 
     if (response.status === 204 || response.status > 400) {
-      return getRecentlyPlayed(accessToken);
+      return getRecentlyPlayedData(accessToken);
     }
 
     const data = await response.json();
 
     if (!data.is_playing || !data.item) {
-      return getRecentlyPlayed(accessToken);
+      return getRecentlyPlayedData(accessToken);
     }
 
-    return {
-      isPlaying: true,
-      title: data.item.name,
-      artist: data.item.artists
-        .map((a: { name: string }) => a.name)
-        .join(", "),
-      albumImageUrl: data.item.album.images?.[0]?.url,
-      songUrl: data.item.external_urls?.spotify,
-    };
+    const current = extractTrack(data.item, true, data.progress_ms);
+
+    // Also fetch recently played for the "previous" track
+    const previous = await getRecentlyPlayedTrack(accessToken);
+
+    return { current, previous };
   } catch {
-    return { isPlaying: false };
+    return { current: { isPlaying: false } };
   }
 }
 
-async function getRecentlyPlayed(accessToken: string) {
+async function getRecentlyPlayedData(accessToken: string) {
   try {
     const response = await fetch(SPOTIFY_RECENTLY_PLAYED_URL, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     if (!response.ok) {
-      return { isPlaying: false };
+      return { current: { isPlaying: false } };
     }
 
     const data = await response.json();
-    const track = data.items?.[0]?.track;
+    const items = data.items ?? [];
 
-    if (!track) {
-      return { isPlaying: false };
+    if (items.length === 0) {
+      return { current: { isPlaying: false } };
     }
 
-    return {
-      isPlaying: false,
-      title: track.name,
-      artist: track.artists.map((a: { name: string }) => a.name).join(", "),
-      albumImageUrl: track.album.images?.[0]?.url,
-      songUrl: track.external_urls?.spotify,
-    };
+    const current = extractTrack(items[0].track, false);
+    const previous =
+      items.length > 1
+        ? extractTrack(items[1].track, false)
+        : undefined;
+
+    return { current, previous };
   } catch {
-    return { isPlaying: false };
+    return { current: { isPlaying: false } };
+  }
+}
+
+async function getRecentlyPlayedTrack(accessToken: string) {
+  try {
+    const response = await fetch(SPOTIFY_RECENTLY_PLAYED_URL, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) return undefined;
+
+    const data = await response.json();
+    const track = data.items?.[0]?.track;
+    if (!track) return undefined;
+
+    return extractTrack(track, false);
+  } catch {
+    return undefined;
   }
 }

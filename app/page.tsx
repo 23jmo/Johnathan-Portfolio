@@ -1,5 +1,4 @@
 import ThemeToggle from "@/components/ui/ThemeToggle";
-import SpotifyNowPlaying from "@/components/ui/SpotifyNowPlaying";
 import HeroSection from "@/components/sections/HeroSection";
 import ExperienceSection from "@/components/sections/ExperienceSection";
 import ProjectsSection from "@/components/sections/ProjectsSection";
@@ -22,7 +21,6 @@ export default function Home() {
       <YouTubeSection />
       <SocialsSection />
       <BlogPreviewSection />
-      <SpotifyNowPlaying />
       <CTAFooter />
     </main>
   );

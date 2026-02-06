@@ -48,4 +48,11 @@ export interface SpotifyTrack {
   artist?: string;
   albumImageUrl?: string;
   songUrl?: string;
+  progressMs?: number;
+  durationMs?: number;
+}
+
+export interface SpotifyData {
+  current: SpotifyTrack;
+  previous?: SpotifyTrack;
 }

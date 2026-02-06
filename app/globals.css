@@ -78,6 +78,50 @@ body.dark {
   animation: pulse-dot 1.5s ease-in-out infinite;
 }
 
+/* Sound bar equalizer animation */
+@keyframes sound-bar {
+  0%, 100% { height: 20%; }
+  50% { height: 100%; }
+}
+
+.sound-bar-1 { animation: sound-bar 0.8s ease-in-out infinite; }
+.sound-bar-2 { animation: sound-bar 0.6s ease-in-out infinite 0.15s; }
+.sound-bar-3 { animation: sound-bar 0.9s ease-in-out infinite 0.3s; }
+.sound-bar-4 { animation: sound-bar 0.7s ease-in-out infinite 0.05s; }
+
+/* Fade in for previous track */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 0.5; transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}
+
+/* Liquid glass dock effect */
+.spotify-glass-dock {
+  position: relative;
+}
+
+.spotify-glass-dock::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.15) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+body.dark .spotify-glass-dock::before {
+  background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.12) 100%);
+}
+
 /* Selection color */
 ::selection {
   background-color: var(--accent);

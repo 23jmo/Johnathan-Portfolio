@@ -95,7 +95,7 @@ export const education: Education[] = [
   {
     school: "Columbia University",
     logo: "/images/logos/columbia.svg",
-    degree: "B.E. Computer Science",
+    degree: "CS",
     gpa: "3.95 / 4.0",
     date: "2024 – 2028",
   },
@@ -129,11 +129,6 @@ export const socialLinks: SocialLink[] = [
     name: "LinkedIn",
     url: "https://www.linkedin.com/in/johnathan-mo/",
     icon: "/icons/linkedin.svg",
-  },
-  {
-    name: "YouTube",
-    url: "https://youtube.com/@johnathanmo",
-    icon: "/icons/youtube.svg",
   },
   {
     name: "X",
