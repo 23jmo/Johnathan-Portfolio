@@ -120,11 +120,7 @@ export const education: Education[] = [
 export const awards: Award[] = [
   {
     title: "TreeHacks 2025 Winner",
-    description: "Stanford's annual hackathon.",
-  },
-  {
-    title: "Dean's List",
-    description: "University of Michigan College of Engineering.",
+    description: "",
   },
 ];
 
