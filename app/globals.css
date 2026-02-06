@@ -1,0 +1,152 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-muted: var(--muted);
+  --color-border: var(--border-color);
+  --font-sans: var(--font-figtree);
+}
+
+:root {
+  --background: #fafafa;
+  --foreground: #1a1a1a;
+  --accent: #2563eb;
+  --muted: #6b7280;
+  --border-color: #e5e7eb;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --accent: #60a5fa;
+  --muted: #9ca3af;
+  --border-color: #27272a;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  transition: background-color 300ms ease, color 300ms ease;
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.15) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+body.dark {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+}
+
+/* Custom cursor styles */
+.custom-cursor {
+  position: fixed;
+  width: 12px;
+  height: 12px;
+  background: var(--foreground);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: difference;
+  transition: transform 150ms ease;
+}
+
+.custom-cursor.hovering {
+  transform: scale(3);
+}
+
+/* Scroll progress bar */
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  z-index: 9999;
+  transition: width 50ms linear;
+}
+
+/* Spotify pulse animation */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.spotify-pulse {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* Sound bar equalizer animation */
+@keyframes sound-bar {
+  0%, 100% { height: 20%; }
+  50% { height: 100%; }
+}
+
+.sound-bar-1 { animation: sound-bar 0.8s ease-in-out infinite; }
+.sound-bar-2 { animation: sound-bar 0.6s ease-in-out infinite 0.15s; }
+.sound-bar-3 { animation: sound-bar 0.9s ease-in-out infinite 0.3s; }
+.sound-bar-4 { animation: sound-bar 0.7s ease-in-out infinite 0.05s; }
+
+/* Fade in for previous track */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 0.5; transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}
+
+/* Liquid glass dock effect */
+.spotify-glass-dock {
+  position: relative;
+}
+
+.spotify-glass-dock::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.15) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+body.dark .spotify-glass-dock::before {
+  background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.12) 100%);
+}
+
+/* Selection color */
+::selection {
+  background-color: var(--accent);
+  color: white;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Hide custom cursor on touch devices */
+@media (pointer: coarse) {
+  .custom-cursor {
+    display: none;
+  }
+}
+
+/* MDX blog typography */
+.prose a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose a:hover {
+  opacity: 0.8;
+}
