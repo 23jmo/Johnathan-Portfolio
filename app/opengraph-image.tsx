@@ -28,34 +28,30 @@ export default async function Image() {
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: "24px",
-            maxWidth: "1000px",
+            gap: "32px",
           }}
         >
           <h1
             style={{
-              fontSize: "72px",
-              fontWeight: "600",
+              fontSize: "96px",
+              fontWeight: "700",
               margin: "0",
-              lineHeight: "1.1",
+              lineHeight: "1",
               color: "#000",
             }}
           >
-            Hi, I'm <strong>Johnathan Mo</strong>{" "}
-            <span style={{ color: "#71717a" }}>(Jmo)</span>.
+            Johnathan Mo
           </h1>
           <p
             style={{
-              fontSize: "36px",
+              fontSize: "48px",
               margin: "0",
-              lineHeight: "1.5",
-              color: "#18181b",
-              opacity: 0.9,
+              lineHeight: "1.3",
+              color: "#52525b",
+              fontWeight: "400",
             }}
           >
-            I'm a CS student at <strong>Columbia University</strong>. I love
-            building software that solves real problems — from AR surgery tools
-            to typing games.
+            CS @ Columbia University
           </p>
         </div>
       </div>
