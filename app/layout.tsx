@@ -10,20 +10,28 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Johnathan Mo",
   description:
-    "CS student at Columbia University. Building software across research labs, startups, and big tech.",
+    "CS student at Columbia University. Building software across research labs, startups, big tech, and quant.",
   openGraph: {
     title: "Johnathan Mo",
     description:
-      "CS student at Columbia University. Building software across research labs, startups, and big tech.",
+      "CS student at Columbia University. Building software across research labs, startups, big tech, and quant.",
     url: "https://johnathanmo.com",
     siteName: "Johnathan Mo",
     type: "website",
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Johnathan Mo - CS Student at Columbia University",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Johnathan Mo",
     description:
-      "CS student at Columbia University. Building software across research labs, startups, bit tech, and quant.",
+      "CS student at Columbia University. Building software across research labs, startups, big tech, and quant.",
   },
 };
 
