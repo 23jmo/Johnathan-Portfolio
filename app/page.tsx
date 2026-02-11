@@ -4,7 +4,7 @@ import ExperienceSection from "@/components/sections/ExperienceSection";
 import ProjectsSection from "@/components/sections/ProjectsSection";
 import EducationSection from "@/components/sections/EducationSection";
 // import AwardsSection from "@/components/sections/AwardsSection";
-// import YouTubeSection from "@/components/sections/YouTubeSection";
+import YouTubeVideosSection from "@/components/sections/YouTubeVideosSection";
 import HackathonsSection from "@/components/sections/HackathonsSection";
 import SocialsSection from "@/components/sections/SocialsSection";
 import BlogPreviewSection from "@/components/sections/BlogPreviewSection";
@@ -18,9 +18,9 @@ export default function Home() {
       <ExperienceSection />
       <ProjectsSection />
       <EducationSection />
+      <YouTubeVideosSection />
       <HackathonsSection />
       {/* <AwardsSection /> */}
-      {/* <YouTubeSection /> */}
       <SocialsSection />
       <BlogPreviewSection />
       <CTAFooter />
