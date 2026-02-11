@@ -79,7 +79,7 @@ export const projects: Project[] = [
     name: "typr",
     language: "TypeScript",
     description: "Competitive typing racing app — real-time multiplayer.",
-    link: "https://github.com/23jmo/typr",
+    link: "https://playtypr.com",
     logo: "",
   },
   {
@@ -169,4 +169,27 @@ export const socialLinks: SocialLink[] = [
 
 export const youtubeChannel = "https://www.youtube.com/@jmooooooooo";
 
-export const ctaLink = "https://calendly.com/johnathanmo";
+export const ctaLink = "https://booking.akiflow.com/johnathan-m-0da1";
+
+export interface Hackathon {
+  name: string;
+  icon: string;
+  link?: string;
+}
+
+export const hackathons: Hackathon[] = [
+  {
+    name: "TreeHacks 2025",
+    icon: "/icons/treehacks.svg",
+    link: "https://devpost.com/software/omnom-hg16v3",
+  },
+  {
+    name: "Devfest 2026",
+    icon: "/icons/devfest.svg",
+    link: "https://devpost.com/software/opticon",
+  },
+  {
+    name: "Bootstrapping Reality 2025",
+    icon: "/icons/bootstrapping-reality.svg",
+  },
+];
