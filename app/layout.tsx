@@ -5,6 +5,7 @@ import CustomCursor from "@/components/ui/CustomCursor";
 import ScrollProgress from "@/components/ui/ScrollProgress";
 import PaperAirplane from "@/components/ui/PaperAirplane";
 import SpotifyNowPlaying from "@/components/ui/SpotifyNowPlaying";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -54,6 +55,7 @@ export default function RootLayout({
           <CustomCursor />
           {children}
           <SpotifyNowPlaying />
+          <Analytics />
         </ThemeProvider>
       </body>
     </html>
