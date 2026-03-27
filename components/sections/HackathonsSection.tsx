@@ -15,7 +15,7 @@ export default function HackathonsSection() {
     <FadeInOnScroll>
       <section>
         <p className="text-xl leading-relaxed text-foreground/90">
-          <strong>3x hackathon winner</strong>{" "}
+          <strong>4x hackathon winner</strong>{" "}
           <IconCluster items={hackathonItems} />
         </p>
       </section>

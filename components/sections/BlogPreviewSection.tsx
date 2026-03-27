@@ -1,9 +1,12 @@
-import { getAllPosts } from "@/lib/blog";
 import Link from "next/link";
 import FadeInOnScroll from "@/components/ui/FadeInOnScroll";
+import type { BlogPost } from "@/types";
 
-export default function BlogPreviewSection() {
-  const posts = getAllPosts().slice(0, 3);
+interface BlogPreviewSectionProps {
+  posts: BlogPost[];
+}
+
+export default function BlogPreviewSection({ posts }: BlogPreviewSectionProps) {
 
   if (posts.length === 0) {
     return null;

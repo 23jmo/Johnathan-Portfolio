@@ -4,12 +4,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
+export const revalidate = 3600;
+
 interface BlogPostPageProps {
   params: Promise<{ slug: string }>;
 }
 
 export async function generateStaticParams() {
-  const posts = getAllPosts();
+  const posts = await getAllPosts();
   return posts.map((post) => ({ slug: post.slug }));
 }
 
@@ -17,7 +19,7 @@ export async function generateMetadata({
   params,
 }: BlogPostPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const post = await getPostBySlug(slug);
   if (!post) return { title: "Post Not Found" };
   return {
     title: `${post.title} — Johnathan Mo`,
@@ -27,7 +29,7 @@ export async function generateMetadata({
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const post = await getPostBySlug(slug);
 
   if (!post) {
     notFound();
@@ -42,9 +44,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         &larr; All posts
       </Link>
       <article>
-        <h1 className="text-3xl font-semibold mb-2">
-          {post.title}
-        </h1>
+        <h1 className="text-3xl font-semibold mb-2">{post.title}</h1>
         <p className="text-sm text-muted mb-8">{post.date}</p>
         <div className="prose prose-neutral dark:prose-invert max-w-none">
           <MDXRemote source={post.content} />

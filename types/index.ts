@@ -16,6 +16,21 @@ export interface Project {
   link: string;
   logo: string;
   isPrivate?: boolean;
+  techStack: string[];
+  date?: string;
+  image?: string;
+}
+
+export interface Hackathon {
+  name: string;
+  projectName: string;
+  icon: string;
+  link?: string;
+  description: string;
+  techStack: string[];
+  isWinner?: boolean;
+  awards?: { name: string; prize?: string }[];
+  image?: string;
 }
 
 export interface Education {

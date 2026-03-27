@@ -1,29 +1,18 @@
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import HeroSection from "@/components/sections/HeroSection";
-import ExperienceSection from "@/components/sections/ExperienceSection";
-import ProjectsSection from "@/components/sections/ProjectsSection";
-import EducationSection from "@/components/sections/EducationSection";
-// import AwardsSection from "@/components/sections/AwardsSection";
-import YouTubeVideosSection from "@/components/sections/YouTubeVideosSection";
-import HackathonsSection from "@/components/sections/HackathonsSection";
-import SocialsSection from "@/components/sections/SocialsSection";
-import BlogPreviewSection from "@/components/sections/BlogPreviewSection";
-import CTAFooter from "@/components/sections/CTAFooter";
+import ContentSwitcher from "@/components/sections/ContentSwitcher";
+import { getAllPosts } from "@/lib/blog";
 
-export default function Home() {
+export const revalidate = 3600;
+
+export default async function Home() {
+  const blogPosts = (await getAllPosts()).slice(0, 3);
+
   return (
     <main className="mx-auto max-w-2xl px-6 py-16 space-y-8">
       <ThemeToggle />
       <HeroSection />
-      <ExperienceSection />
-      <ProjectsSection />
-      <EducationSection />
-      <YouTubeVideosSection />
-      <HackathonsSection />
-      {/* <AwardsSection /> */}
-      <SocialsSection />
-      <BlogPreviewSection />
-      <CTAFooter />
+      <ContentSwitcher blogPosts={blogPosts} />
     </main>
   );
 }

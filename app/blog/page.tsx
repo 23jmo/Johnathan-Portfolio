@@ -2,13 +2,15 @@ import { getAllPosts } from "@/lib/blog";
 import Link from "next/link";
 import type { Metadata } from "next";
 
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: "Blog — Johnathan Mo",
   description: "Thoughts on CS, research, and building things.",
 };
 
-export default function BlogPage() {
-  const posts = getAllPosts();
+export default async function BlogPage() {
+  const posts = await getAllPosts();
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">

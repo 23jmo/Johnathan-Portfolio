@@ -1,4 +1,4 @@
-import type { Experience, Project, Education, SocialLink, Award } from "@/types";
+import type { Experience, Project, Education, SocialLink, Award, Hackathon } from "@/types";
 
 export const experiences: Experience[] = [
   {
@@ -69,11 +69,44 @@ export const experiences: Experience[] = [
 
 export const projects: Project[] = [
   {
+    name: "Tabby",
+    language: "Swift",
+    description: "Universal AI autocomplete for macOS — Cursor-like ghost text in every text field.",
+    link: "https://www.tabby-ai.com/",
+    logo: "",
+    techStack: ["Swift", "macOS", "Next.js"],
+    date: "2026",
+    image: "/images/projects/tabby.png",
+  },
+  {
+    name: "drafted.college",
+    language: "TypeScript",
+    description: "AI-powered college essay editing platform — real-time feedback and draft management.",
+    link: "https://drafted.college",
+    logo: "",
+    techStack: ["TypeScript", "Next.js", "AI"],
+    date: "2026",
+    image: "/images/projects/drafted.png",
+  },
+  {
+    name: "Argue",
+    language: "Swift, TypeScript",
+    description: "AI-powered screen time negotiation app — set limits through conversation, not restriction.",
+    link: "https://argue-landing.vercel.app/",
+    logo: "",
+    techStack: ["Swift", "SwiftUI", "TypeScript", "Chrome Extension"],
+    date: "2026",
+    image: "/images/projects/argue.png",
+  },
+  {
     name: "linkedin-semantic",
     language: "TypeScript",
     description: "Semantic search engine for LinkedIn connections and profiles.",
     link: "https://github.com/23jmo/linkedin-semantic",
     logo: "",
+    techStack: ["TypeScript", "Next.js", "OpenAI", "Pinecone"],
+    date: "2025",
+    image: "/images/projects/linkedin-semantic.png",
   },
   {
     name: "typr",
@@ -81,14 +114,9 @@ export const projects: Project[] = [
     description: "Competitive typing racing app — real-time multiplayer.",
     link: "https://playtypr.com",
     logo: "",
-  },
-  {
-    name: "Mojo",
-    language: "Swift",
-    description: "Mobile app project.",
-    link: "",
-    logo: "",
-    isPrivate: true,
+    techStack: ["TypeScript", "Next.js", "WebSockets", "Tailwind CSS"],
+    date: "2024",
+    image: "/images/projects/typr.png",
   },
   {
     name: "Comicgen",
@@ -97,6 +125,8 @@ export const projects: Project[] = [
     link: "",
     logo: "",
     isPrivate: true,
+    techStack: ["Python", "Stable Diffusion", "Flask"],
+    date: "2023",
   },
 ];
 
@@ -122,6 +152,11 @@ export const education: Education[] = [
 ];
 
 export const awards: Award[] = [
+  {
+    title: "TreeHacks 2026 Winner",
+    description: "",
+    icon: "/icons/treehacks.svg",
+  },
   {
     title: "TreeHacks 2025 Winner",
     description: "",
@@ -165,31 +200,58 @@ export const socialLinks: SocialLink[] = [
     url: "https://instagram.com/jmomomo_",
     icon: "/icons/instagram.svg",
   },
+  {
+    name: "Email",
+    url: "mailto:johnathan.mo@columbia.edu",
+    icon: "/icons/email.svg",
+  },
 ];
 
 export const youtubeChannel = "https://www.youtube.com/@jmooooooooo";
 
 export const ctaLink = "https://booking.akiflow.com/johnathan-m-0da1";
 
-export interface Hackathon {
-  name: string;
-  icon: string;
-  link?: string;
-}
-
 export const hackathons: Hackathon[] = [
   {
+    name: "TreeHacks 2026",
+    projectName: "Mira",
+    icon: "/icons/treehacks.svg",
+    link: "https://devpost.com/software/mira-3xqlos",
+    description: "AI-powered smart mirror for personalized styling and outfit recommendations.",
+    techStack: ["React", "TypeScript", "Python", "MediaPipe", "OpenAI", "ElevenLabs"],
+    isWinner: true,
+    awards: [{ name: "Future of Commerce", prize: "$10,000" }],
+    image: "/images/hackathons/mira.png",
+  },
+  {
     name: "TreeHacks 2025",
+    projectName: "OmNom",
     icon: "/icons/treehacks.svg",
     link: "https://devpost.com/software/omnom-hg16v3",
+    description: "6-foot autonomous robot that fetches food across campus using computer vision.",
+    techStack: ["React", "Python", "FastAPI", "YOLOv8", "OpenAI", "Arduino"],
+    isWinner: true,
+    awards: [{ name: "Most Creative Hack" }],
+    image: "/images/hackathons/omnom.png",
   },
   {
     name: "Devfest 2026",
+    projectName: "Opticon",
     icon: "/icons/devfest.svg",
     link: "https://devpost.com/software/opticon",
+    description: "Orchestrates multiple AI agents in isolated VMs for parallel task execution.",
+    techStack: ["Next.js", "Python", "Socket.io", "E2B", "PostgreSQL"],
+    isWinner: true,
+    awards: [{ name: "Best Computer Use" }, { name: "Best Use of K2 Think" }],
+    image: "/images/hackathons/opticon.png",
   },
   {
     name: "Bootstrapping Reality 2025",
+    projectName: "Orby",
     icon: "/icons/bootstrapping-reality.svg",
+    description: "AR/VR hackathon exploring spatial interaction techniques.",
+    techStack: ["Unity", "C#", "Meta Quest SDK"],
+    isWinner: true,
+    awards: [{ name: "Winner" }],
   },
 ];
