@@ -110,6 +110,22 @@ const Home = () => {
           />
         </Suspense>
       </Canvas>
+      <div className="absolute bottom-20 right-4 z-10">
+        <iframe 
+          src="https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M?utm_source=generator" 
+          width="300" 
+          height="80" 
+          frameBorder="0" 
+          allowFullScreen=""
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          loading="lazy"
+          className="rounded-lg shadow-lg"
+          style={{ 
+            background: 'rgba(0, 0, 0, 0.7)',
+            border: 'none'
+          }}
+        ></iframe>
+      </div>
       <div className="absolute bottom-2 left-2 right-0">
         <img  
           src={!isPlayingMusic ? soundoff : soundon}
