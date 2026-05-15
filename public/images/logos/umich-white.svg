@@ -1,0 +1,33 @@
+<svg viewBox="0 0 1160 826" xmlns="http://www.w3.org/2000/svg">
+  <!-- White circular background that fills the viewBox -->
+  <circle cx="580" cy="413" r="580" fill="white"/>
+
+  <!-- Michigan M in maize yellow (#FFCB05) -->
+  <g>
+    <!-- Top left horizontal bar -->
+    <rect x="0" y="0" width="438" height="228" fill="#FFCB05"/>
+    <!-- Top right horizontal bar -->
+    <rect x="722" y="0" width="438" height="228" fill="#FFCB05"/>
+
+    <!-- Left outer vertical leg -->
+    <rect x="0" y="228" width="89" height="598" fill="#FFCB05"/>
+    <!-- Right outer vertical leg -->
+    <rect x="1071" y="228" width="89" height="598" fill="#FFCB05"/>
+
+    <!-- Left inner vertical leg -->
+    <rect x="343" y="366" width="95" height="460" fill="#FFCB05"/>
+    <!-- Right inner vertical leg -->
+    <rect x="722" y="366" width="95" height="460" fill="#FFCB05"/>
+
+    <!-- Bottom left horizontal bar -->
+    <rect x="0" y="652" width="438" height="174" fill="#FFCB05"/>
+    <!-- Bottom right horizontal bar -->
+    <rect x="722" y="652" width="438" height="174" fill="#FFCB05"/>
+
+    <!-- Top V cutout (white triangle) -->
+    <polygon points="438,0 580,325 722,0" fill="white"/>
+
+    <!-- Bottom V cutout (white triangle) -->
+    <polygon points="343,366 580,681 817,366" fill="white"/>
+  </g>
+</svg>

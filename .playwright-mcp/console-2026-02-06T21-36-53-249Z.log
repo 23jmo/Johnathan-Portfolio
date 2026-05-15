@@ -1,0 +1,35 @@
+[ 1200506ms] TypeError: Cannot read properties of undefined (reading 'isPlaying')
+    at SpotifyNowPlaying (http://localhost:3000/_next/static/chunks/Johnathan-Portfolio_components_ui_f196c5b0._.js:552:32)
+    at Object.react_stack_bottom_frame (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-dom_363e3c12._.js:14826:24)
+    at renderWithHooks (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-dom_363e3c12._.js:4651:24)
+    at updateFunctionComponent (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-dom_363e3c12._.js:6112:21)
+    at beginWork (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-dom_363e3c12._.js:6708:24)
+    at runWithFiberInDEV (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-dom_363e3c12._.js:965:74)
+    at performUnitOfWork (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-dom_363e3c12._.js:9562:97)
+    at workLoopSync (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-dom_363e3c12._.js:9456:40)
+    at renderRootSync (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-dom_363e3c12._.js:9440:13)
+    at performWorkOnRoot (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-dom_363e3c12._.js:9105:47)
+    at performWorkOnRootViaSchedulerTask (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-dom_363e3c12._.js:10230:9)
+    at MessagePort.performWorkUntilDeadline (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_7ca4d483._.js:2647:64)
+[ 2060399ms] ReferenceError: AwardsSection is not defined
+    at Home (about://React/Server/file:///Users/johnathanmo/Johnathan-Portfolio/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__06d236df._.js?303:995:291)
+    at resolveErrorDev (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-server-dom-turbopack_f6a233fa._.js:1894:106)
+    at processFullStringRow (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-server-dom-turbopack_f6a233fa._.js:2402:29)
+    at processFullBinaryRow (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-server-dom-turbopack_f6a233fa._.js:2361:9)
+    at processBinaryChunk (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-server-dom-turbopack_f6a233fa._.js:2470:221)
+    at progress (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-server-dom-turbopack_f6a233fa._.js:2640:13)
+[ 2151355ms] [WARNING] [HMR] Invalid message: {"isTrusted":true}
+TypeError: Cannot convert undefined or null to object
+    at Object.keys (<anonymous>)
+    at extractModulesFromTurbopackMessage (http://localhost:3000/_next/static/chunks/7a417_next_dist_client_fb66ff7e._.js:11210:39)
+    at TurbopackHmr.onTurbopackMessage (http://localhost:3000/_next/static/chunks/7a417_next_dist_client_fb66ff7e._.js:11157:32)
+    at processMessage (http://localhost:3000/_next/static/chunks/7a417_next_dist_client_fb66ff7e._.js:11589:30)
+    at WebSocket.handleMessage (http://localhost:3000/_next/static/chunks/7a417_next_dist_client_fb66ff7e._.js:10914:52) @ http://localhost:3000/_next/static/chunks/7a417_next_dist_0561b7d4._.js:2297
+[ 2151423ms] ReferenceError: YouTubeSection is not defined
+    at Home (about://React/Server/file:///Users/johnathanmo/Johnathan-Portfolio/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__4469008a._.js?126:974:291)
+    at resolveErrorDev (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-server-dom-turbopack_f6a233fa._.js:1894:106)
+    at processFullStringRow (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-server-dom-turbopack_f6a233fa._.js:2402:29)
+    at processFullBinaryRow (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-server-dom-turbopack_f6a233fa._.js:2361:9)
+    at processBinaryChunk (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-server-dom-turbopack_f6a233fa._.js:2470:221)
+    at progress (http://localhost:3000/_next/static/chunks/7a417_next_dist_compiled_react-server-dom-turbopack_f6a233fa._.js:2640:13)
+[ 2477327ms] [WARNING] %c%s%c [33m[1m⚠[22m[39m metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase background: #e6e6e6;background: light-dark(rgba(0,0,0,0.1), rgba(255,255,255,0.25));color: #000000;color: light-dark(#000000, #ffffff);border-radius: 2px  Server   @ http://localhost:3000/_next/static/chunks/7a417_next_dist_0561b7d4._.js:2297

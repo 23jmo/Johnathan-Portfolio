@@ -1,0 +1,80 @@
+export interface Experience {
+  title: string;
+  company: string;
+  logo: string;
+  date: string;
+  description: string;
+  link?: string;
+  logoScale?: number;
+  logoBackground?: string;
+}
+
+export interface Project {
+  name: string;
+  language: string;
+  description: string;
+  link: string;
+  logo: string;
+  isPrivate?: boolean;
+  techStack: string[];
+  date?: string;
+  image?: string;
+}
+
+export interface Hackathon {
+  name: string;
+  projectName: string;
+  icon: string;
+  link?: string;
+  description: string;
+  techStack: string[];
+  isWinner?: boolean;
+  awards?: { name: string; prize?: string }[];
+  image?: string;
+}
+
+export interface Education {
+  school: string;
+  logo: string;
+  degree: string;
+  gpa: string;
+  date: string;
+  link?: string;
+  logoBackground?: string;
+  logoScale?: number;
+}
+
+export interface SocialLink {
+  name: string;
+  url: string;
+  icon: string;
+}
+
+export interface Award {
+  title: string;
+  description: string;
+  icon?: string;
+}
+
+export interface BlogPost {
+  slug: string;
+  title: string;
+  date: string;
+  excerpt: string;
+  content: string;
+}
+
+export interface SpotifyTrack {
+  isPlaying: boolean;
+  title?: string;
+  artist?: string;
+  albumImageUrl?: string;
+  songUrl?: string;
+  progressMs?: number;
+  durationMs?: number;
+}
+
+export interface SpotifyData {
+  current: SpotifyTrack;
+  previous?: SpotifyTrack;
+}
