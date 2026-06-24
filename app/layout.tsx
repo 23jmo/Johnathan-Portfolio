@@ -5,6 +5,7 @@ import CustomCursor from "@/components/ui/CustomCursor";
 import ScrollProgress from "@/components/ui/ScrollProgress";
 import PaperAirplane from "@/components/ui/PaperAirplane";
 import SpotifyNowPlaying from "@/components/ui/SpotifyNowPlaying";
+import ScrollChatStage from "@/components/scrollchat/ScrollChatStage";
 import { Analytics } from "@vercel/analytics/next";
 import { Agentation } from "agentation";
 import "./globals.css";
@@ -46,7 +47,9 @@ export default function RootLayout({
           <PaperAirplane />
           <ScrollProgress />
           <CustomCursor />
-          {children}
+          {/* Wraps the page so it can warp/stretch as the visitor pulls past the
+              bottom, revealing the AI chat footer rising from below. */}
+          <ScrollChatStage>{children}</ScrollChatStage>
           <SpotifyNowPlaying />
           <Analytics />
           {process.env.NODE_ENV === "development" && <Agentation />}

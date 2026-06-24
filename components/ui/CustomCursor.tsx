@@ -46,5 +46,5 @@ export default function CustomCursor() {
     };
   }, []);
 
-  return <div ref={cursorRef} className="custom-cursor" />;
+  return <div ref={cursorRef} data-warp-ignore className="custom-cursor" />;
 }

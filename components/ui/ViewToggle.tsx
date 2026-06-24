@@ -2,9 +2,11 @@
 
 import { motion } from "framer-motion";
 
+export type HomeView = "me" | "builds" | "notes";
+
 interface ViewToggleProps {
-  activeView: "me" | "builds";
-  onViewChange: (view: "me" | "builds") => void;
+  activeView: HomeView;
+  onViewChange: (view: HomeView) => void;
 }
 
 export default function ViewToggle({
@@ -14,6 +16,7 @@ export default function ViewToggle({
   const tabs = [
     { key: "me" as const, label: "Me" },
     { key: "builds" as const, label: "Builds" },
+    { key: "notes" as const, label: "Notes" },
   ];
 
   return (

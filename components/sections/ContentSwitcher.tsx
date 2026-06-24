@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { BlogPost } from "@/types";
-import ViewToggle from "@/components/ui/ViewToggle";
+import type { BlogPost, NotesDoc } from "@/types";
+import ViewToggle, { type HomeView } from "@/components/ui/ViewToggle";
 import FadeInOnScroll from "@/components/ui/FadeInOnScroll";
 import ExperienceSection from "@/components/sections/ExperienceSection";
 import ProjectsSection from "@/components/sections/ProjectsSection";
@@ -13,13 +13,18 @@ import SocialsSection from "@/components/sections/SocialsSection";
 import BlogPreviewSection from "@/components/sections/BlogPreviewSection";
 import CTAFooter from "@/components/sections/CTAFooter";
 import BuildsView from "@/components/sections/BuildsView";
+import NotesView from "@/components/sections/NotesView";
 
 interface ContentSwitcherProps {
   blogPosts: BlogPost[];
+  notes: NotesDoc[];
 }
 
-export default function ContentSwitcher({ blogPosts }: ContentSwitcherProps) {
-  const [activeView, setActiveView] = useState<"me" | "builds">("me");
+export default function ContentSwitcher({
+  blogPosts,
+  notes,
+}: ContentSwitcherProps) {
+  const [activeView, setActiveView] = useState<HomeView>("me");
 
   return (
     <>
@@ -38,6 +43,9 @@ export default function ContentSwitcher({ blogPosts }: ContentSwitcherProps) {
       </div>
       <div className={activeView === "builds" ? "" : "hidden"}>
         <BuildsView />
+      </div>
+      <div className={activeView === "notes" ? "" : "hidden"}>
+        <NotesView notes={notes} />
       </div>
     </>
   );

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="320" viewBox="0 0 640 320" fill="none" font-family="ui-sans-serif, system-ui, sans-serif">
+  <rect width="640" height="320" rx="12" fill="#f4f4f5"/>
+  <text x="320" y="40" text-anchor="middle" font-size="18" font-weight="600" fill="#18181b">Process Memory Layout</text>
+
+  <g>
+    <rect x="120" y="64" width="400" height="40" rx="6" fill="#dbeafe" stroke="#93c5fd"/>
+    <text x="320" y="89" text-anchor="middle" font-size="14" fill="#1e3a8a">Stack &#8595; (grows down)</text>
+
+    <rect x="120" y="120" width="400" height="56" rx="6" fill="#fef3c7" stroke="#fcd34d"/>
+    <text x="320" y="153" text-anchor="middle" font-size="14" fill="#78350f">Heap &#8593; (grows up)</text>
+
+    <rect x="120" y="192" width="400" height="40" rx="6" fill="#dcfce7" stroke="#86efac"/>
+    <text x="320" y="217" text-anchor="middle" font-size="14" fill="#14532d">BSS / Data (globals, statics)</text>
+
+    <rect x="120" y="248" width="400" height="40" rx="6" fill="#e4e4e7" stroke="#a1a1aa"/>
+    <text x="320" y="273" text-anchor="middle" font-size="14" fill="#27272a">Text (program code)</text>
+  </g>
+</svg>

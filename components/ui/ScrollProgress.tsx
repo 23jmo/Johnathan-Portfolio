@@ -18,5 +18,11 @@ export default function ScrollProgress() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  return <div className="scroll-progress" style={{ width: `${progress}%` }} />;
+  return (
+    <div
+      data-warp-ignore
+      className="scroll-progress"
+      style={{ width: `${progress}%` }}
+    />
+  );
 }

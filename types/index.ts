@@ -64,6 +64,102 @@ export interface BlogPost {
   content: string;
 }
 
+export interface NotesDoc {
+  slug: string;
+  title: string;
+  date: string;
+  tags?: string[];
+  summary?: string;
+  draft?: boolean;
+  content: string;
+}
+
+export interface TocItem {
+  id: string;
+  text: string;
+  depth: number;
+}
+
+/* ── Scroll-to-AI-Chat ─────────────────────────────────────────── */
+
+/** A grounded source the AI can cite — maps a stable id to a destination. */
+export interface Source {
+  id: string;
+  label: string;
+  /** In-site anchor (e.g. "/#projects") or external URL. */
+  href: string;
+  /** Whether href points off-site (controls target/rel + icon). */
+  external?: boolean;
+}
+
+/** A citation attached to an assistant message, referencing a Source by id. */
+export interface Citation {
+  /** Inline marker number, e.g. the `2` in `[2]`. */
+  n: number;
+  sourceId: string;
+  label: string;
+  href: string;
+  external?: boolean;
+}
+
+/** An inline YouTube video rendered in a chat message. */
+export interface ChatYouTubeVideo {
+  videoId: string;
+  title: string;
+  thumbnail?: string;
+  viewCount?: string;
+}
+
+/** One message in the chat transcript. */
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  /** Markdown text content (assistant streams into this). */
+  content: string;
+  citations?: Citation[];
+  /** Raw A2UI JSONL surfaces emitted by the assistant, if any. */
+  a2uiSurfaces?: string[];
+  /** YouTube videos rendered inline (via the render_youtube tool). */
+  youtube?: ChatYouTubeVideo[];
+  /** True while the assistant message is still streaming. */
+  pending?: boolean;
+}
+
+/** The page the user warped in from — becomes the context chip. */
+export interface PageContext {
+  /** Human label, e.g. "Projects" or "Notes — From C to C++". */
+  title: string;
+  /** Pathname the chip links back to. */
+  path: string;
+}
+
+/* ── A2UI (generative UI) ──────────────────────────────────────── */
+
+/** A single declared component node in an A2UI surface (adjacency-list form). */
+export interface A2UINode {
+  id: string;
+  component: string;
+  props?: Record<string, unknown>;
+  /** Child node ids, resolved against the surface's node map. */
+  children?: string[];
+}
+
+/** Parsed state of one A2UI surface: node map + bound data model. */
+export interface A2UIState {
+  nodes: Record<string, A2UINode>;
+  dataModel: Record<string, unknown>;
+  /** Root node id (defaults to "root"). */
+  rootId: string;
+}
+
+/** An action emitted by an A2UI component (e.g. a button) back to the agent. */
+export interface A2UIAction {
+  /** Send this text as a new chat turn. */
+  sendMessage?: string;
+  /** Navigate to this href instead (external or in-site). */
+  href?: string;
+}
+
 export interface SpotifyTrack {
   isPlaying: boolean;
   title?: string;

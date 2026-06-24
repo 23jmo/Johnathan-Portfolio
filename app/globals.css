@@ -18,6 +18,7 @@
   --accent: #2563eb;
   --muted: #6b7280;
   --border-color: #e5e7eb;
+  --code-bg: #f6f8fa;
 }
 
 .dark {
@@ -26,6 +27,7 @@
   --accent: #60a5fa;
   --muted: #9ca3af;
   --border-color: #27272a;
+  --code-bg: #161616;
 }
 
 body {
@@ -132,6 +134,104 @@ body.dark .spotify-glass-dock::before {
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+  /* Reserve the scrollbar gutter so pinning the body (chat scroll-lock) doesn't
+     reflow the page sideways when the scrollbar disappears. */
+  scrollbar-gutter: stable;
+}
+
+/* Scroll-to-AI-chat: body scroll is locked while the chat footer is engaged. */
+body.scrollchat-locked {
+  overflow: hidden;
+}
+
+/* ── Scroll-to-AI-chat ─────────────────────────────────────────────────────
+   The chat is a stationary backdrop that lives behind the page; the page warps
+   into a circle and flies off as the chip. The "Apple Intelligence" colour now
+   frames the whole VIEWPORT (`.scrollchat-screenglow`), not the panel itself. */
+
+/* Clean, calm near-black chat surface (Gemini-minimal). A single, very subtle
+   top vignette gives it a touch of depth without competing with the glow. */
+.scrollchat-panel {
+  background-color: #0a0a0c;
+  background-image: radial-gradient(
+    120% 80% at 50% -10%,
+    rgba(120, 130, 160, 0.06),
+    transparent 60%
+  );
+}
+
+/* The viewport-framing glow: a hue-cycling conic gradient masked to a soft
+   border ring (transparent center → opaque edges), blurred into a glow. The
+   radial mask is farthest-at-corners, so corners light up most. */
+@property --sc-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.scrollchat-screenglow {
+  background: conic-gradient(
+    from var(--sc-angle),
+    #ff2d55, #ff9500, #ffcc00, #34c759, #32ade6, #007aff, #af52de, #ff2d55
+  );
+  /* Wide colored band hugging the edges (transparent center → opaque edge), so
+     the rainbow reads as a vivid frame rather than a thin muddy ring. */
+  -webkit-mask: radial-gradient(125% 125% at 50% 50%, transparent 38%, #000 74%);
+  mask: radial-gradient(125% 125% at 50% 50%, transparent 38%, #000 74%);
+  filter: blur(26px) saturate(1.8) brightness(1.25);
+  /* Slowly rotate the hue around the frame + gently breathe the intensity. */
+  animation: scrollchat-glow-rotate 7s linear infinite,
+    scrollchat-aurora-breathe 4.5s ease-in-out infinite;
+}
+
+/* The brighter "flash" copy stacked on top — opacity is driven by keystroke
+   energy from JS, so it must NOT animate its own opacity here. Crisper (less
+   blur) + brighter so each keystroke visibly punches through. */
+.scrollchat-screenglow--bright {
+  filter: blur(15px) saturate(2) brightness(1.8);
+  animation: scrollchat-glow-rotate 7s linear infinite;
+}
+
+/* Reduced-motion: a quiet, still frame at a fixed intensity. */
+.scrollchat-screenglow--static {
+  animation: none;
+  opacity: 0.6;
+}
+
+@keyframes scrollchat-glow-rotate {
+  to { --sc-angle: 360deg; }
+}
+
+@keyframes scrollchat-aurora-breathe {
+  0%, 100% { opacity: 0.78; }
+  50% { opacity: 1; }
+}
+
+/* The "Ask my AI" entry-pill spark: a spinning conic rainbow dot with a glow. */
+.scrollchat-spark {
+  background: conic-gradient(
+    from 0deg, #ff2d55, #ff9500, #34c759, #32ade6, #af52de, #ff2d55
+  );
+  box-shadow: 0 0 9px 1px rgba(99, 130, 255, 0.7);
+  animation: scrollchat-spark-spin 3.5s linear infinite,
+    pulse-dot 2.4s ease-in-out infinite;
+}
+
+@keyframes scrollchat-spark-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Respect reduced-motion: no warp, quiet experience */
+@media (prefers-reduced-motion: reduce) {
+  .spotify-pulse,
+  .sound-bar-1,
+  .sound-bar-2,
+  .sound-bar-3,
+  .sound-bar-4,
+  .scrollchat-screenglow,
+  .scrollchat-spark {
+    animation: none;
+  }
 }
 
 /* Hide custom cursor on touch devices */
@@ -184,4 +284,198 @@ html {
 
 .prose > :last-child {
   margin-bottom: 0;
+}
+
+/* ============================================================
+   Notes reader typography (.prose-notes)
+   Self-contained typographic scope for class notes — independent
+   of the @tailwindcss/typography plugin so the custom component
+   templates (callouts, code, tables) keep full control of color.
+   ============================================================ */
+.prose-notes {
+  color: var(--foreground);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.prose-notes > :first-child {
+  margin-top: 0;
+}
+
+.prose-notes > :last-child {
+  margin-bottom: 0;
+}
+
+/* Headings */
+.prose-notes h1 {
+  font-size: 1.875rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  margin-top: 0;
+  margin-bottom: 0.75em;
+}
+
+.prose-notes h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: 0.6em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.prose-notes h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 1.6em;
+  margin-bottom: 0.5em;
+}
+
+.prose-notes h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 1.4em;
+  margin-bottom: 0.4em;
+}
+
+/* Body text */
+.prose-notes p {
+  margin-top: 0.9em;
+  margin-bottom: 0.9em;
+}
+
+.prose-notes strong {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.prose-notes a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+.prose-notes a:hover {
+  opacity: 0.8;
+}
+
+/* Lists */
+.prose-notes ul,
+.prose-notes ol {
+  margin-top: 0.9em;
+  margin-bottom: 0.9em;
+  padding-left: 1.4em;
+}
+
+.prose-notes ul {
+  list-style-type: disc;
+}
+
+.prose-notes ol {
+  list-style-type: decimal;
+}
+
+.prose-notes ul ul,
+.prose-notes ol ol,
+.prose-notes ul ol,
+.prose-notes ol ul {
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+}
+
+.prose-notes li {
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+  padding-left: 0.25em;
+}
+
+.prose-notes li::marker {
+  color: var(--muted);
+}
+
+/* GFM task lists */
+.prose-notes li.task-list-item {
+  list-style: none;
+  margin-left: -1.4em;
+  padding-left: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+}
+
+.prose-notes li.task-list-item input[type="checkbox"] {
+  width: 1em;
+  height: 1em;
+  accent-color: var(--accent);
+  transform: translateY(0.1em);
+}
+
+/* Heading hover-anchor (appended by rehype-autolink-headings) */
+.prose-notes .heading-anchor {
+  margin-left: 0.4em;
+  color: var(--muted);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  font-weight: 400;
+}
+
+.prose-notes :is(h1, h2, h3, h4):hover .heading-anchor,
+.prose-notes .heading-anchor:focus-visible {
+  opacity: 1;
+}
+
+/* Footnotes (from remark-gfm) */
+.prose-notes .footnotes {
+  margin-top: 3em;
+  padding-top: 1.5em;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.prose-notes .footnotes h2 {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0.5em;
+}
+
+.prose-notes [data-footnote-ref] {
+  text-decoration: none;
+  font-weight: 600;
+  padding: 0 0.15em;
+}
+
+/* ============================================================
+   Shiki dual-theme code highlighting (zero-JS theme swap)
+   rehype-pretty-code emits both --shiki-light and --shiki-dark
+   per token; we select which to read based on the .dark class.
+   ============================================================ */
+.prose-notes pre {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.prose-notes pre code {
+  display: block;
+}
+
+.prose-notes pre code .line {
+  display: inline-block;
+  width: 100%;
+}
+
+.prose-notes pre code span {
+  color: var(--shiki-light);
+}
+
+.dark .prose-notes pre code span {
+  color: var(--shiki-dark);
 }
