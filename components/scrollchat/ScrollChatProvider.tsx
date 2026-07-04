@@ -18,7 +18,14 @@ import {
 } from "framer-motion";
 import type { ChatMessage, Citation, PageContext } from "@/types";
 import {
+  CLOSE_FLY_SPRING,
+  CLOSE_OVERLAP_TRIGGER,
+  CLOSE_PROGRESS_SPRING,
+  COMMIT_VELOCITY_MAX,
+  FLY_OVERLAP_TRIGGER,
+  FLY_SPRING,
   PROGRESS_SPRING,
+  REVERSING_WATCHDOG_MS,
   pageContextFromPath,
   type ScrollChatPhase,
 } from "@/lib/scrollchat/state";
@@ -105,9 +112,31 @@ export default function ScrollChatProvider({
   }, []);
 
   /**
-   * Commit → two spring beats:
+   * Spike the screen-framing glow, then spring it back to 0. Called on every
+   * keystroke (small `strength`) and harder on space, so the Apple-Intelligence
+   * border visibly reacts to typing. Spikes accumulate when typing fast. Also
+   * fired at full strength on commit as the visual counterpart to playCommit().
+   */
+  const pulse = useCallback(
+    (strength = 0.35) => {
+      glowDecayRef.current?.stop();
+      glowPulse.set(Math.min(1.3, glowPulse.get() + strength));
+      glowDecayRef.current = animate(glowPulse, 0, {
+        type: "spring",
+        stiffness: 170,
+        damping: 20,
+        restDelta: 0.002,
+      });
+    },
+    [glowPulse]
+  );
+
+  /**
+   * Commit → two OVERLAPPED spring beats:
    *   1. `progress` → 1: finish warping the page into a COMPLETE circle.
-   *   2. `fly` → 1: send that circle flying down + shrinking into the chip slot.
+   *   2. `fly` → 1: send that circle flying down + shrinking into the chip slot,
+   *      launched the moment progress crosses FLY_OVERLAP_TRIGGER — NOT at
+   *      numerical rest — so the circle never visibly stalls between beats.
    * Phase flips to "chat" only once the circle has landed as the chip.
    */
   const open = useCallback(
@@ -124,23 +153,50 @@ export default function ScrollChatProvider({
         return;
       }
       setPhase("warping");
+      pulse(1); // visual commit flash to pair with the audio cue
+
+      let flyStarted = false;
+      const startFly = () => {
+        if (flyStarted) return;
+        flyStarted = true;
+        flyRef.current = animate(fly, 1, {
+          ...FLY_SPRING,
+          onComplete: () => setPhase("chat"),
+        });
+      };
+
+      // Carry the gesture's momentum into the commit spring so a fast flick
+      // doesn't freeze-then-restart. Clamped: wheel deltas can spike velocity
+      // to 10–20 units/s; negatives (easing back at release) carry nothing.
+      const launchVelocity = Math.min(
+        Math.max(progress.getVelocity(), 0),
+        COMMIT_VELOCITY_MAX
+      );
+
+      // Immediate-commit path (full pull → ratio already ≥ trigger): the spring
+      // below animates ~1→1 and may never fire onUpdate, so check up front.
+      if (progress.get() >= FLY_OVERLAP_TRIGGER) startFly();
+
       warpRef.current = animate(progress, 1, {
         ...PROGRESS_SPRING,
-        onComplete: () => {
-          flyRef.current = animate(fly, 1, {
-            type: "spring",
-            stiffness: 260,
-            damping: 26,
-            restDelta: 0.001,
-            onComplete: () => setPhase("chat"),
-          });
+        velocity: launchVelocity,
+        // onUpdate dies with warpRef.current.stop(), so cancellation is free —
+        // no subscription to clean up in close()/the next open()/unmount.
+        onUpdate: (latest) => {
+          if (latest >= FLY_OVERLAP_TRIGGER) startFly();
         },
+        onComplete: startFly, // fallback; no-op if the overlap already fired
       });
     },
-    [pathname, progress, fly, reducedMotion]
+    [pathname, progress, fly, reducedMotion, pulse]
   );
 
-  /** Reverse the commit: fly the chip back to center, then unwarp to the page. */
+  /**
+   * Reverse the commit, also overlapped: fly the chip back toward center, and
+   * once `fly` falls to CLOSE_OVERLAP_TRIGGER start unwarping the page too.
+   * Phase flips to "idle" only when BOTH springs have completed — premature
+   * idle would re-arm the gesture and unlock body scroll mid-frame.
+   */
   const close = useCallback(() => {
     warpRef.current?.stop();
     flyRef.current?.stop();
@@ -153,38 +209,40 @@ export default function ScrollChatProvider({
       return;
     }
     setPhase("reversing");
+
+    let unwindStarted = false;
+    let flyDone = false;
+    let progressDone = false;
+    const maybeIdle = () => {
+      if (flyDone && progressDone) setPhase("idle");
+    };
+    const startUnwind = () => {
+      if (unwindStarted) return;
+      unwindStarted = true;
+      warpRef.current = animate(progress, 0, {
+        ...CLOSE_PROGRESS_SPRING,
+        onComplete: () => {
+          progressDone = true;
+          maybeIdle();
+        },
+      });
+    };
+
+    // Closing mid-"warping" (fly still near 0) → unwind progress immediately.
+    if (fly.get() <= CLOSE_OVERLAP_TRIGGER) startUnwind();
+
     flyRef.current = animate(fly, 0, {
-      type: "spring",
-      stiffness: 300,
-      damping: 30,
-      restDelta: 0.001,
+      ...CLOSE_FLY_SPRING,
+      onUpdate: (latest) => {
+        if (latest <= CLOSE_OVERLAP_TRIGGER) startUnwind();
+      },
       onComplete: () => {
-        warpRef.current = animate(progress, 0, {
-          ...PROGRESS_SPRING,
-          onComplete: () => setPhase("idle"),
-        });
+        flyDone = true;
+        startUnwind(); // fallback; no-op if the overlap already fired
+        maybeIdle();
       },
     });
   }, [progress, fly, reducedMotion]);
-
-  /**
-   * Spike the screen-framing glow, then spring it back to 0. Called on every
-   * keystroke (small `strength`) and harder on space, so the Apple-Intelligence
-   * border visibly reacts to typing. Spikes accumulate when typing fast.
-   */
-  const pulse = useCallback(
-    (strength = 0.35) => {
-      glowDecayRef.current?.stop();
-      glowPulse.set(Math.min(1.3, glowPulse.get() + strength));
-      glowDecayRef.current = animate(glowPulse, 0, {
-        type: "spring",
-        stiffness: 170,
-        damping: 20,
-        restDelta: 0.002,
-      });
-    },
-    [glowPulse]
-  );
 
   const setUserName = useCallback((name: string) => {
     const trimmed = name.trim();
@@ -381,6 +439,39 @@ export default function ScrollChatProvider({
       document.body.classList.remove("scrollchat-locked");
     };
   }, [phase]);
+
+  // Exit backstop. "idle" normally arrives via close()'s two spring
+  // onCompletes, but a spring interrupted mid-flight (HMR remount cleanup, a
+  // stray value.stop(), a competing animation on the same value) would strand
+  // the phase at "reversing" forever: body locked, gesture dead, warp styles
+  // cooked on the page. Two independent recoveries:
+  //   1. Promote to idle the moment both values are actually at rest —
+  //      value-driven, so it works no matter which callback got dropped.
+  //   2. A hard watchdog: reversing may never outlive REVERSING_WATCHDOG_MS
+  //      (normal exit is ~350–550ms); past it, force both values to 0 and
+  //      exit. The forced set() also fires the change events PageWarp needs
+  //      to clear its inline styles.
+  useEffect(() => {
+    if (phase !== "reversing") return;
+    const settle = () => {
+      if (progress.get() <= 0.001 && fly.get() <= 0.001) setPhase("idle");
+    };
+    settle();
+    const unsubProgress = progress.on("change", settle);
+    const unsubFly = fly.on("change", settle);
+    const watchdog = window.setTimeout(() => {
+      warpRef.current?.stop();
+      flyRef.current?.stop();
+      progress.set(0);
+      fly.set(0);
+      setPhase("idle");
+    }, REVERSING_WATCHDOG_MS);
+    return () => {
+      unsubProgress();
+      unsubFly();
+      window.clearTimeout(watchdog);
+    };
+  }, [phase, progress, fly]);
 
   useEffect(
     () => () => {

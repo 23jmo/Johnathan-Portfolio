@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { motion, useTransform } from "framer-motion";
 import { useScrollChat } from "./ScrollChatProvider";
 import ChatFooter from "./ChatFooter";
+import { CHIP_DIAMETER, CHIP_CENTER_FROM_BOTTOM } from "@/lib/scrollchat/chip";
 
 /**
  * Warps the live page into the chat as the visitor pulls past the bottom. The
@@ -42,10 +42,6 @@ const FISHEYE_STRENGTH = -90;
 const LIFT_FRACTION = 0.42;
 /** The completed circle's radius (px) right before it flies off as the chip. */
 const CIRCLE_MIN_RADIUS = 66;
-/** Resting chip diameter (px) once the circle has flown into the chat. */
-const CHIP_DIAMETER = 38;
-/** Chip CENTER, in px above the viewport bottom (just above the input bar). */
-const CHIP_CENTER_FROM_BOTTOM = 132;
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 const smoothstep = (t: number) => {
@@ -103,20 +99,19 @@ interface Region {
 }
 
 export default function PageWarp({ children }: { children: ReactNode }) {
-  const { progress, fly, reducedMotion, phase } = useScrollChat();
+  const { progress, fly, phase, reducedMotion } = useScrollChat();
   const pathname = usePathname();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const clipRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const dispRef = useRef<SVGFEDisplacementMapElement>(null);
+  // Latest clearStyles from the warp effect, callable by the phase failsafe.
+  const clearStylesRef = useRef<(() => void) | null>(null);
   // Mirror of `region` readable inside the imperative warp loop without it
   // becoming a hook dependency (the loop runs on every progress frame).
   const regionRef = useRef<Region | null>(null);
   const [region, setRegion] = useState<Region | null>(null);
   const [mapUri, setMapUri] = useState("");
-
-  // The chip-slot ring fades in as the circle lands as the chip (fly → 1).
-  const ringOpacity = useTransform(fly, [0.5, 1], [0, 1]);
 
   // Measure the bottom-viewport filter region and (re)build the matching map.
   const recompute = () => {
@@ -144,9 +139,70 @@ export default function PageWarp({ children }: { children: ReactNode }) {
 
   // Drive the warp straight from progress + fly; clear ALL inline styles at rest
   // so exiting the chat restores a pristine page.
+  //
+  // Perf: the page is scroll-locked / wheel-prevented for the whole gesture, so
+  // the viewport, scroll position, and the chip landing slot can't move — we
+  // cache them ONCE on "engage" (the first applied frame) and keep the per-frame
+  // apply() free of forced layout reads. A single rAF coalesces the two
+  // MotionValue subscriptions so apply() runs at most once per browser frame
+  // (progress + fly otherwise both fire → apply twice). And the full-page
+  // fisheye filter — the dominant cost — is REMOVED (string cleared, not just
+  // zeroed) the instant its bulge is imperceptible, so Blink drops the filter
+  // layer instead of rasterizing every page pixel through the shader each frame.
   useEffect(() => {
     if (reducedMotion) return;
     let applied = false;
+
+    // Per-gesture cache, (re)populated by engage() on the first applied frame.
+    let vh = 0;
+    let vw = 0;
+    let cx = 0;
+    let cyDoc = 0;
+    let rMax = 0;
+    let hasDef = false;
+    let target = { cx: 0, cy: 0, d: CHIP_DIAMETER };
+
+    const engage = () => {
+      vh = window.innerHeight;
+      vw = window.innerWidth;
+      const reg = regionRef.current;
+      cx = reg ? reg.w / 2 : vw / 2;
+      cyDoc = window.scrollY + vh / 2;
+      rMax = (Math.hypot(cx * 2, vh) / 2) * 1.25;
+      hasDef = !!document.getElementById("scrollchat-fisheye");
+
+      // Land the flying circle exactly on the in-input chip slot. Measured ONCE
+      // here (the slot is stationary during the gesture); fall back to a fixed
+      // slot if the chip isn't mounted (e.g. the name gate is showing).
+      const chipEl = document.querySelector<HTMLElement>("[data-chat-chip]");
+      if (chipEl) {
+        const cr = chipEl.getBoundingClientRect();
+        target = {
+          cx: cr.left + cr.width / 2,
+          cy: cr.top + cr.height / 2,
+          d: cr.width,
+        };
+      } else {
+        target = {
+          cx: vw / 2,
+          cy: vh - CHIP_CENTER_FROM_BOTTOM,
+          d: CHIP_DIAMETER,
+        };
+      }
+
+      // Styles that never change during a gesture — set once here (cleared in
+      // clearStyles), not rewritten every frame. The page MUST be opaque so it
+      // occludes the chat behind it; its bg normally lives on <body> (which the
+      // lift doesn't move), so we paint it onto the clip layer for the warp.
+      const k = clipRef.current;
+      if (k) {
+        k.style.background = "var(--background)";
+        k.style.position = "relative";
+        k.style.zIndex = "9996";
+        k.style.pointerEvents = "none";
+        k.style.willChange = "transform, clip-path";
+      }
+    };
 
     const clearStyles = () => {
       const c = contentRef.current;
@@ -177,13 +233,8 @@ export default function PageWarp({ children }: { children: ReactNode }) {
       const c = contentRef.current;
       const k = clipRef.current;
       const d = dispRef.current;
-      const reg = regionRef.current;
       if (!c || !k) return;
-
-      const vh = window.innerHeight;
-      const vw = window.innerWidth;
-      const cx = reg ? reg.w / 2 : vw / 2;
-      const cyDoc = window.scrollY + vh / 2;
+      if (!applied) engage();
 
       // PULL — rubber-band lift: concave (1−(1−p)²) so each unit of scroll lifts
       // the page LESS than the last (elastic overscroll, "hard to scroll up"),
@@ -197,31 +248,22 @@ export default function PageWarp({ children }: { children: ReactNode }) {
       const flyEase = smoothstep(f);
 
       // Bottom fisheye bend — grows with the pull, eases off as the circle forms.
-      if (d) {
-        d.setAttribute("scale", String(FISHEYE_STRENGTH * p * (1 - collapse)));
-      }
-      // A url() to a missing filter renders the element fully invisible in
-      // Blink/WebKit, so only reference it once the def exists.
-      const hasDef = !!document.getElementById("scrollchat-fisheye");
-      const lens = hasDef ? "url(#scrollchat-fisheye)" : "";
-
+      // Once the bulge is imperceptible we REMOVE the filter string entirely (not
+      // just zero its scale) so Blink drops the full-page filter layer rather
+      // than rasterizing every page pixel through the shader every frame.
+      const effectiveScale = FISHEYE_STRENGTH * p * (1 - collapse);
+      if (d) d.setAttribute("scale", String(effectiveScale));
+      const lens =
+        hasDef && Math.abs(effectiveScale) > 0.5 ? "url(#scrollchat-fisheye)" : "";
       // INNER (contentRef): ONLY the bottom lens — deliberately NO whole-page
       // brightness/blur/opacity (the page never dims; only its bottom feathers).
       c.style.filter = lens;
       c.style.willChange = lens ? "filter" : "";
 
-      // OUTER (clipRef): lift (pull) → circle + fly (commit).
-      // The page MUST be opaque so it fully occludes the chat behind it — only
-      // the feathered bottom edge should reveal the chat. The page's own bg
-      // normally lives on <body> (which the lift doesn't move), so we paint the
-      // page background onto the clip layer itself for the duration of the warp.
-      k.style.background = "var(--background)";
-
       // Feather ONLY a modest band at the page's bottom edge while pulling, so
       // the chat peeks through softly there (a "little bit", not a whole-page
       // fade). The band grows with the lift and dissolves as the circle forms.
-      const feather =
-        Math.max(40, lift * 0.7) * (1 - smoothstep(f / 0.25));
+      const feather = Math.max(40, lift * 0.7) * (1 - smoothstep(f / 0.25));
       if (feather > 0.5) {
         const m = `linear-gradient(to bottom, #000 calc(100% - ${feather}px), transparent 100%)`;
         k.style.setProperty("mask-image", m);
@@ -233,27 +275,28 @@ export default function PageWarp({ children }: { children: ReactNode }) {
 
       // Clip to a circle only during the commit; rMax is larger than the
       // viewport so the instant it engages there's no visible clip (seamless).
-      const rMax = (Math.hypot(cx * 2, vh) / 2) * 1.25;
       const r = rMax + (CIRCLE_MIN_RADIUS - rMax) * collapse;
       k.style.clipPath = f > 0.0001 ? `circle(${r}px at ${cx}px ${cyDoc}px)` : "none";
 
       // Transform: interpolate from the lifted page (TY = −lift, full size) to
-      // the chip slot (chip size, just above the input). The clip circle's
-      // center sits at (cx, cyDoc) in local space; transform-origin matches so
-      // the scale pivots there.
-      const sFinal = CHIP_DIAMETER / (2 * CIRCLE_MIN_RADIUS);
+      // the measured chip slot (chip size, at the in-input tile). The clip
+      // circle's center sits at viewport (cx, vh/2); translate it onto the
+      // target center; transform-origin matches so the scale pivots there.
+      const sFinal = target.d / (2 * CIRCLE_MIN_RADIUS);
       const S = 1 + (sFinal - 1) * flyEase;
-      const TX = (vw / 2 - cx) * flyEase;
       const TYPull = -lift;
-      const TYChip = vh / 2 - CHIP_CENTER_FROM_BOTTOM;
-      const TY = TYPull + (TYChip - TYPull) * flyEase;
+      const TX = (target.cx - cx) * flyEase;
+      const TY = TYPull + (target.cy - vh / 2 - TYPull) * flyEase;
       k.style.transformOrigin = `${cx}px ${cyDoc}px`;
       k.style.transform = `translate(${TX}px, ${TY}px) scale(${S})`;
-      k.style.opacity = "1";
-      k.style.position = "relative";
-      k.style.zIndex = "9996";
-      k.style.pointerEvents = "none";
-      k.style.willChange = "transform, clip-path";
+
+      // HANDOFF — dissolve the page-circle over the fly's back half so only the
+      // designed in-input chip (revealed beneath) remains; without it the raw
+      // page-circle peeks out / shows THROUGH the chip. Reverses symmetrically.
+      // Window [0.62, 0.9]: dissolve completes at ~33px visible diameter vs the
+      // 30px tile — a near-parity crossfade ("the page BECOMES the chip"), not
+      // an 81px circle vanishing while a 30px tile pops in elsewhere.
+      k.style.opacity = String(1 - smoothstep((f - 0.62) / 0.28));
 
       applied = true;
     };
@@ -262,27 +305,50 @@ export default function PageWarp({ children }: { children: ReactNode }) {
       const p = clamp01(progress.get());
       const f = clamp01(fly.get());
       if (p <= 0.0008 && f <= 0.0008) {
-        if (applied) clearStyles();
+        // Unconditional (not gated on `applied`): after an HMR remount React
+        // reuses these DOM nodes, so they can carry cooked styles from the
+        // PREVIOUS effect epoch that this closure never applied.
+        clearStyles();
         return true;
       }
       return false;
     };
 
-    const unsubProgress = progress.on("change", () => {
-      if (maybeRest()) return;
-      apply(clamp01(progress.get()), clamp01(fly.get()));
-    });
-    const unsubFly = fly.on("change", () => {
-      if (maybeRest()) return;
-      apply(clamp01(progress.get()), clamp01(fly.get()));
-    });
+    // Coalesce both MotionValue subscriptions into a single rAF so apply() runs
+    // at most once per frame on the freshest progress + fly (no double-apply, no
+    // stale-read race between the two callbacks).
+    let rafId: number | null = null;
+    const scheduleApply = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        if (maybeRest()) return;
+        apply(clamp01(progress.get()), clamp01(fly.get()));
+      });
+    };
+
+    const unsubProgress = progress.on("change", scheduleApply);
+    const unsubFly = fly.on("change", scheduleApply);
+    clearStylesRef.current = clearStyles;
 
     return () => {
       unsubProgress();
       unsubFly();
+      if (rafId !== null) cancelAnimationFrame(rafId);
       clearStyles();
+      clearStylesRef.current = null;
     };
   }, [progress, fly, reducedMotion]);
+
+  // Failsafe: the instant the state machine returns to "idle", force a pristine
+  // page. Styles are normally cleared by maybeRest() off value-change events,
+  // but that path has no authoritative backstop — a dropped final rAF (occluded
+  // tab, HMR seam) would otherwise leave the page cooked with no event left to
+  // heal it. Safe unconditionally: idle is only entered with both values at 0,
+  // and a pull re-applies styles via change events without a phase transition.
+  useEffect(() => {
+    if (phase === "idle") clearStylesRef.current?.();
+  }, [phase]);
 
   if (reducedMotion) {
     return (
@@ -348,22 +414,6 @@ export default function PageWarp({ children }: { children: ReactNode }) {
           </div>
         </div>
       </div>
-
-      {/* The chip slot: a soft ring + glow that frames the warped page-circle
-          once it lands as the chip (fades in with `fly`). The circle itself —
-          the real warped page — sits just behind this ring at the same spot. */}
-      {phase !== "idle" && (
-        <motion.div
-          aria-hidden
-          style={{
-            opacity: ringOpacity,
-            width: CHIP_DIAMETER,
-            height: CHIP_DIAMETER,
-            bottom: CHIP_CENTER_FROM_BOTTOM - CHIP_DIAMETER / 2,
-          }}
-          className="pointer-events-none fixed left-1/2 z-[9997] -translate-x-1/2 rounded-full ring-1 ring-white/30 shadow-[0_0_22px_2px_rgba(140,150,255,0.45)]"
-        />
-      )}
     </>
   );
 }

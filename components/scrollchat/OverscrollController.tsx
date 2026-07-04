@@ -4,12 +4,15 @@ import { useEffect, useRef } from "react";
 import { animate } from "framer-motion";
 import { useScrollChat } from "./ScrollChatProvider";
 import {
+  ARM_ACCENT_RESET_RATIO,
+  BOTTOM_DWELL_MS,
   COMMIT_RATIO,
   GESTURE_THRESHOLD,
   PROGRESS_SPRING,
   REARM_COOLDOWN,
+  WHEEL_STREAM_GAP,
 } from "@/lib/scrollchat/state";
-import { ensureAudio, playDialTick } from "@/lib/scrollchat/audio";
+import { ensureAudio, playArm, playDialTick } from "@/lib/scrollchat/audio";
 
 /** ms gap with no wheel/touch input before a pull counts as "released". */
 const RELEASE_MS = 110;
@@ -30,12 +33,20 @@ export default function OverscrollController() {
 
   const budget = useRef(0);
   const lastTouchY = useRef<number | null>(null);
+  // Timestamp of the most recent wheel event ANYWHERE on the page — used to
+  // tell a fresh, deliberate pull from the momentum tail of an earlier scroll.
+  const lastWheelAt = useRef(0);
+  // When the page ARRIVED at the bottom (null while away from it). A pull only
+  // arms after the page has SETTLED there for BOTTOM_DWELL_MS.
+  const bottomSince = useRef<number | null>(null);
   const cooldownUntil = useRef(0);
   const phaseRef = useRef(phase);
   const pulling = useRef(false);
   const springRef = useRef<ReturnType<typeof animate> | null>(null);
   const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTickStep = useRef(-1);
+  // One-shot "armed" accent (crossed COMMIT_RATIO — release now = commit).
+  const armAccentFired = useRef(false);
   // Haptics are only allowed after a real touch (tap). Trackpad/wheel input
   // isn't a tap, so calling navigator.vibrate there is blocked + warns — gate it.
   const touchUsed = useRef(false);
@@ -49,6 +60,7 @@ export default function OverscrollController() {
       budget.current = 0;
       pulling.current = false;
       lastTickStep.current = -1;
+      armAccentFired.current = false;
       springRef.current?.stop();
       springRef.current = null;
     } else {
@@ -64,10 +76,24 @@ export default function OverscrollController() {
 
     const atBottom = () => docBottomGap() <= 2;
 
+    // Stamp when the page reaches the bottom; clear the stamp when it leaves.
+    // Driven by scroll events (covers wheel, keyboard, scrollbar, and touch
+    // inertia arrivals alike) + run once for a page that loads at the bottom.
+    const trackBottom = () => {
+      if (atBottom()) {
+        if (bottomSince.current === null) bottomSince.current = performance.now();
+      } else {
+        bottomSince.current = null;
+      }
+    };
+    trackBottom();
+
     const canStart = () =>
       phaseRef.current === "idle" &&
       performance.now() >= cooldownUntil.current &&
-      atBottom();
+      atBottom() &&
+      bottomSince.current !== null &&
+      performance.now() - bottomSince.current >= BOTTOM_DWELL_MS;
 
     const stopSpring = () => {
       springRef.current?.stop();
@@ -83,6 +109,16 @@ export default function OverscrollController() {
           lastTickStep.current = step;
           playDialTick(ratio);
           vibrate(5);
+        }
+        // One-shot accent on crossing the commit threshold, with hysteresis
+        // (re-arms only below ARM_ACCENT_RESET_RATIO) so hovering around the
+        // line doesn't chatter the cue.
+        if (!armAccentFired.current && ratio >= COMMIT_RATIO) {
+          armAccentFired.current = true;
+          playArm();
+          vibrate(18);
+        } else if (armAccentFired.current && ratio < ARM_ACCENT_RESET_RATIO) {
+          armAccentFired.current = false;
         }
       }
       return ratio;
@@ -104,6 +140,7 @@ export default function OverscrollController() {
       const ratio = Math.min(1, budget.current / GESTURE_THRESHOLD);
       budget.current = 0;
       lastTickStep.current = -1;
+      armAccentFired.current = false;
 
       if (ratio >= COMMIT_RATIO) {
         if (!reducedMotion) vibrate([12, 8, 20]);
@@ -138,6 +175,9 @@ export default function OverscrollController() {
     };
 
     const onWheel = (e: WheelEvent) => {
+      const sinceLastWheel = performance.now() - lastWheelAt.current;
+      lastWheelAt.current = performance.now();
+
       if (e.deltaY <= 0) {
         // Scrolling up during a pull eases it back down rather than committing.
         if (pulling.current) {
@@ -149,7 +189,14 @@ export default function OverscrollController() {
         }
         return;
       }
-      if (!pulling.current && !canStart()) return;
+      if (!pulling.current) {
+        if (!canStart()) return;
+        // A pull must START from a distinct gesture. Trackpad momentum (the
+        // inertia tail of the scroll that carried the page to the bottom)
+        // streams events with no gap, so it can never engage — only a pull
+        // that begins after a beat of wheel silence does.
+        if (sinceLastWheel < WHEEL_STREAM_GAP) return;
+      }
       ensureAudio();
       e.preventDefault();
       beginPull();
@@ -194,12 +241,14 @@ export default function OverscrollController() {
     window.addEventListener("touchstart", onTouchStart, { passive: true });
     window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("touchend", onTouchEnd, { passive: true });
+    window.addEventListener("scroll", trackBottom, { passive: true });
 
     return () => {
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("scroll", trackBottom);
       if (releaseTimer.current) clearTimeout(releaseTimer.current);
       stopSpring();
     };

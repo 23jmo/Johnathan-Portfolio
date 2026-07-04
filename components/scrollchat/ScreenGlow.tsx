@@ -1,6 +1,10 @@
 "use client";
 
 import { motion, useTransform } from "framer-motion";
+import {
+  ARMED_GLOW_INPUT,
+  ARMED_GLOW_OUTPUT,
+} from "@/lib/scrollchat/state";
 import { useScrollChat } from "./ScrollChatProvider";
 
 /**
@@ -22,8 +26,16 @@ export default function ScreenGlow() {
 
   // Overall presence: fades in over the back half of the pull, full in chat.
   const reveal = useTransform(progress, [0.4, 1], [0, 1]);
-  // The typing flash: the bright copy's opacity tracks keystroke energy.
-  const flash = useTransform(glowPulse, [0, 1], [0, 1]);
+  // "Armed" accent: the bright layer steps up once the pull crosses the commit
+  // threshold, then releases toward progress=1 so it never permanently washes
+  // out the typing flash once in chat.
+  const armed = useTransform(progress, ARMED_GLOW_INPUT, ARMED_GLOW_OUTPUT);
+  // The bright copy has ONE opacity consumer — armed + typing flash combined
+  // additively (two style bindings on the same property don't compose).
+  const brightOpacity = useTransform(
+    [glowPulse, armed],
+    ([g, a]: number[]) => Math.min(1, a + Math.min(1, g))
+  );
   // A touch of pulse-driven scale so the frame "breathes outward" as you type.
   const pulseScale = useTransform(glowPulse, [0, 1.3], [1, 1.05]);
 
@@ -47,7 +59,7 @@ export default function ScreenGlow() {
       <motion.div style={{ scale: pulseScale }} className="absolute -inset-2">
         <div className="scrollchat-screenglow absolute inset-0" />
         <motion.div
-          style={{ opacity: flash }}
+          style={{ opacity: brightOpacity }}
           className="scrollchat-screenglow scrollchat-screenglow--bright absolute inset-0"
         />
       </motion.div>

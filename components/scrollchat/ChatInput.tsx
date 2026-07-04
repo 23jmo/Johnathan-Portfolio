@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useScrollChat } from "./ScrollChatProvider";
+import ChatChip from "./ChatChip";
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -53,7 +54,9 @@ export default function ChatInput({
 
   return (
     <div className="pb-5 pt-2">
-      <div className="flex items-end gap-2 rounded-[26px] border border-white/12 bg-white/[0.05] px-4 py-2.5 transition-colors focus-within:border-white/25">
+      <div className="flex items-end gap-2 rounded-[26px] border border-white/12 bg-white/[0.05] px-3 py-2.5 transition-colors focus-within:border-white/25">
+        {/* Page-context chip — the warped page lands here as a leading tile. */}
+        <ChatChip />
         <textarea
           ref={textareaRef}
           value={value}

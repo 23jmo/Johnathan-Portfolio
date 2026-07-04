@@ -69,6 +69,30 @@ export function playDialTick(progress: number) {
   osc.stop(now + 0.09);
 }
 
+/**
+ * Bright one-shot "latch" chirp when the pull crosses the commit threshold —
+ * the audible "release now = commit" marker. Distinct from the dial ticks
+ * (a rising sweep, not a fixed blip) and gentler than the commit sweep.
+ */
+export function playArm() {
+  const audio = ensureAudio();
+  if (!audio || !master) return;
+
+  const now = audio.currentTime;
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(880, now);
+  osc.frequency.exponentialRampToValueAtTime(1245, now + 0.06);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.7, now + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+  osc.connect(gain);
+  gain.connect(master);
+  osc.start(now);
+  osc.stop(now + 0.13);
+}
+
 /** Confirming upward two-note sweep when the gesture commits into the chat. */
 export function playCommit() {
   const audio = ensureAudio();

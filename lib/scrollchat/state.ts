@@ -4,7 +4,26 @@ import type { PageContext } from "@/types";
 export type ScrollChatPhase = "idle" | "warping" | "chat" | "reversing";
 
 /** Wheel/touch budget (in px) required to fully arm the gesture. */
-export const GESTURE_THRESHOLD = 700;
+export const GESTURE_THRESHOLD = 1000;
+
+/**
+ * A pull can only BEGIN after this many ms of wheel silence. Trackpad momentum
+ * (the "let go" inertia tail of the scroll that brought you to the bottom)
+ * streams events continuously at ~16ms intervals, so requiring a quiet gap
+ * means arriving at the bottom with leftover inertia never auto-engages the
+ * gesture — only a distinct, deliberate second pull does. Touch is unaffected:
+ * touchmove only fires with a finger down, and inertia scrolling emits none.
+ */
+export const WHEEL_STREAM_GAP = 150;
+
+/**
+ * The page must have been AT the bottom for this long before a pull can arm.
+ * Complements WHEEL_STREAM_GAP: the gap check blocks a steady momentum tail,
+ * but a single timing hiccup >150ms mid-tail would slip one event through and
+ * open the budget. Dwell is immune to hiccups — the scroll that CARRIED you to
+ * the bottom can never also start the pull, because arrival resets the clock.
+ */
+export const BOTTOM_DWELL_MS = 250;
 
 /** Fraction of the threshold at which releasing commits into the chat. */
 export const COMMIT_RATIO = 0.55;
@@ -24,6 +43,81 @@ export const PROGRESS_SPRING = {
   damping: 26,
   restDelta: 0.001,
 };
+
+/**
+ * On commit, the `fly` beat launches once `progress` crosses this — overlapping
+ * the two beats so the circle never visibly stalls between "formed" and "flies".
+ */
+export const FLY_OVERLAP_TRIGGER = 0.9;
+
+/**
+ * On close, `progress` starts unwinding once `fly` falls to this. Do not raise
+ * above ~0.35: it's the safety margin that keeps the chat's dissolve (which
+ * saturates at progress = COMMIT_RATIO) from fading the chat while the clip
+ * circle doesn't yet cover the viewport.
+ */
+export const CLOSE_OVERLAP_TRIGGER = 0.3;
+
+/** Max progress-velocity (units/s) carried into the commit spring — guards
+ * against 10–20 units/s wheel spikes launching the warp like a slingshot. */
+export const COMMIT_VELOCITY_MAX = 3;
+
+/** Commit beat 2: the completed circle flying down into the chip slot. */
+export const FLY_SPRING = {
+  type: "spring" as const,
+  stiffness: 260,
+  damping: 26,
+  restDelta: 0.001,
+};
+
+/** Exit springs — near-critically damped (no bounce, correct for an exit) and
+ * faster than the entry, so leaving feels lighter than arriving. */
+export const CLOSE_FLY_SPRING = {
+  type: "spring" as const,
+  stiffness: 380,
+  damping: 32,
+  restDelta: 0.001,
+};
+export const CLOSE_PROGRESS_SPRING = {
+  type: "spring" as const,
+  stiffness: 360,
+  damping: 30,
+  restDelta: 0.001,
+};
+
+/** ChatChip arrival: ζ≈0.66 — a single ~7% overshoot settling in ~300ms,
+ * synchronized with the page-circle's dissolve (playful, no wobble). */
+export const CHIP_ARRIVAL_SPRING = {
+  type: "spring" as const,
+  stiffness: 420,
+  damping: 24,
+  mass: 0.8,
+};
+
+/**
+ * Hard ceiling on how long the exit ("reversing") may run before the provider
+ * forces it to finish. The normal exit completes in ~350-550ms; if a spring is
+ * interrupted mid-flight (HMR remount, a stray value.set() cancelling the
+ * animation, a dropped frame) the phase would otherwise wedge at "reversing" —
+ * body locked, gesture dead, warp styles cooked. The watchdog snaps both
+ * values to 0 and flips idle, which also triggers the style-clear failsafe.
+ */
+export const REVERSING_WATCHDOG_MS = 1500;
+
+/**
+ * The one-shot "armed" accent fires when the pull crosses COMMIT_RATIO upward
+ * and re-arms only after dropping back below this — hysteresis so wobbling
+ * around the threshold doesn't chatter the haptic/audio cue.
+ */
+export const ARM_ACCENT_RESET_RATIO = 0.5;
+
+/**
+ * ScreenGlow's "armed" brightness ramp over `progress`: steps up just past the
+ * commit threshold ("release now = commit"), holds, then releases toward 1 so
+ * the bright layer never permanently washes out the typing flash once in chat.
+ */
+export const ARMED_GLOW_INPUT = [0.52, 0.62, 0.8, 1];
+export const ARMED_GLOW_OUTPUT = [0, 0.5, 0.5, 0];
 
 /**
  * Derive a human-friendly page context (title + path) from a pathname. Used to

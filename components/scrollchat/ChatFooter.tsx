@@ -43,6 +43,24 @@ export default function ChatFooter() {
   // point — the page lifting/feathering away is what reveals it, softly.
   const dissolve = useTransform(progress, [0, COMMIT_RATIO], [0, 1]);
 
+  // Fully retire the panel at rest: `visibility: hidden` removes it from
+  // paint, hit-testing, and the compositor (opacity: 0 alone keeps the layer).
+  // Driven off `progress` directly — no re-render — so the first pull frame
+  // flips it visible again in time for the reveal. Every engaged state
+  // (pull, warping, chat, reversing) holds progress > 0, so gating on
+  // progress alone is safe; the panel stays mounted because it must already
+  // exist behind the page for the pull to reveal it.
+  const panelVisibility = useTransform(progress, (p) =>
+    p > 0.001 ? "visible" : "hidden"
+  );
+
+  // Arrival staging for the greeting ONLY: it rides the finger during the pull
+  // and its last ~6px settle on the commit spring, so the chat doesn't just
+  // statically exist behind the dissolve. Deliberately NOT applied to the input
+  // container — PageWarp measures the chip slot once at progress≈0, so a
+  // translated input would make the flying circle land below the real slot.
+  const greetingRise = useTransform(progress, [0, 1], [14, 0]);
+
   // Focus the panel + restore focus on close, only while it's the live dialog.
   useEffect(() => {
     if (!open) return;
@@ -51,15 +69,17 @@ export default function ChatFooter() {
     return () => previouslyFocused?.focus?.();
   }, [open]);
 
-  // Escape to close + focus trap, active only when committed.
+  // Escape to close (also mid-warp, so the commit is abortable) + focus trap
+  // (committed only).
   useEffect(() => {
-    if (!open) return;
+    if (!open && phase !== "warping") return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
         close();
         return;
       }
+      if (!open) return;
       if (e.key === "Tab") {
         const focusables = panelRef.current?.querySelectorAll<HTMLElement>(
           'a[href], button:not([disabled]), input, textarea, [tabindex]:not([tabindex="-1"])'
@@ -78,7 +98,7 @@ export default function ChatFooter() {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, close]);
+  }, [open, phase, close]);
 
   const isEmpty = messages.length === 0;
 
@@ -96,8 +116,16 @@ export default function ChatFooter() {
       inert={!open || undefined}
       style={
         reducedMotion
-          ? { opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none" }
-          : { opacity: dissolve, pointerEvents: open ? "auto" : "none" }
+          ? {
+              opacity: open ? 1 : 0,
+              visibility: open ? "visible" : "hidden",
+              pointerEvents: open ? "auto" : "none",
+            }
+          : {
+              opacity: dissolve,
+              visibility: panelVisibility,
+              pointerEvents: open ? "auto" : "none",
+            }
       }
       // `inset-0`: a full-screen stationary backdrop (NOT a rising footer). It's
       // outside any filtered/transformed ancestor in PageWarp's wrapper, so
@@ -128,14 +156,17 @@ export default function ChatFooter() {
         {needsName ? (
           <NameGate onSubmit={setUserName} />
         ) : isEmpty ? (
-          <div className="flex flex-1 flex-col items-center justify-center text-center">
+          <motion.div
+            style={reducedMotion ? undefined : { y: greetingRise }}
+            className="flex flex-1 flex-col items-center justify-center text-center"
+          >
             <h2 className="text-3xl font-medium tracking-tight text-white/90">
               Hi{userName ? ` ${userName}` : " there"}.
             </h2>
             <p className="mt-2 text-base text-white/45">
               Ask me anything about Johnathan.
             </p>
-          </div>
+          </motion.div>
         ) : (
           <MessageList messages={messages} isStreaming={isStreaming} />
         )}
