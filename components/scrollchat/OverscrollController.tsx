@@ -8,6 +8,8 @@ import {
   BOTTOM_DWELL_MS,
   COMMIT_RATIO,
   GESTURE_THRESHOLD,
+  MOMENTUM_ATTENUATION,
+  MOMENTUM_PROGRESS_CAP,
   PROGRESS_SPRING,
   REARM_COOLDOWN,
   WHEEL_STREAM_GAP,
@@ -47,6 +49,10 @@ export default function OverscrollController() {
   const lastTickStep = useRef(-1);
   // One-shot "armed" accent (crossed COMMIT_RATIO — release now = commit).
   const armAccentFired = useRef(false);
+  // True while the ACTIVE pull was started by momentum spill (an inertia tail),
+  // not a deliberate gesture — fed at a reduced, capped rate so it nudges but
+  // never commits. Latched at pull start; re-evaluated only on the next pull.
+  const momentumOnly = useRef(false);
   // Haptics are only allowed after a real touch (tap). Trackpad/wheel input
   // isn't a tap, so calling navigator.vibrate there is blocked + warns — gate it.
   const touchUsed = useRef(false);
@@ -61,6 +67,7 @@ export default function OverscrollController() {
       pulling.current = false;
       lastTickStep.current = -1;
       armAccentFired.current = false;
+      momentumOnly.current = false;
       springRef.current?.stop();
       springRef.current = null;
     } else {
@@ -88,10 +95,16 @@ export default function OverscrollController() {
     };
     trackBottom();
 
+    // A pull may start any time we're idle + past cooldown + at the bottom.
+    // Momentum is no longer blocked here — it's classified in onWheel and fed
+    // gently, so leftover inertia nudges the warp without committing it.
     const canStart = () =>
       phaseRef.current === "idle" &&
       performance.now() >= cooldownUntil.current &&
-      atBottom() &&
+      atBottom();
+
+    // The page has SETTLED at the bottom (not just arrived mid-inertia).
+    const dwellMet = () =>
       bottomSince.current !== null &&
       performance.now() - bottomSince.current >= BOTTOM_DWELL_MS;
 
@@ -103,7 +116,9 @@ export default function OverscrollController() {
     const setFromBudget = () => {
       const ratio = Math.min(1, budget.current / GESTURE_THRESHOLD);
       progress.set(ratio);
-      if (!reducedMotion && ratio > 0) {
+      // Momentum nudges are purely visual — no dial ticks / haptics / arm
+      // accent, so leftover scroll doesn't chirp or buzz.
+      if (!reducedMotion && ratio > 0 && !momentumOnly.current) {
         const step = Math.floor(ratio * 12);
         if (step !== lastTickStep.current) {
           lastTickStep.current = step;
@@ -141,6 +156,7 @@ export default function OverscrollController() {
       budget.current = 0;
       lastTickStep.current = -1;
       armAccentFired.current = false;
+      momentumOnly.current = false;
 
       if (ratio >= COMMIT_RATIO) {
         if (!reducedMotion) vibrate([12, 8, 20]);
@@ -161,14 +177,17 @@ export default function OverscrollController() {
     };
 
     const applyDelta = (delta: number) => {
-      budget.current = Math.min(
-        GESTURE_THRESHOLD * 1.15,
-        Math.max(0, budget.current + delta)
-      );
+      // Momentum pulls feed at a fraction of full strength and are capped well
+      // below the commit line — they bulge the page a little, then spring back.
+      const scaled = momentumOnly.current ? delta * MOMENTUM_ATTENUATION : delta;
+      const ceiling = momentumOnly.current
+        ? GESTURE_THRESHOLD * MOMENTUM_PROGRESS_CAP
+        : GESTURE_THRESHOLD * 1.15;
+      budget.current = Math.min(ceiling, Math.max(0, budget.current + scaled));
       const ratio = setFromBudget();
       if (ratio >= 1) {
         if (releaseTimer.current) clearTimeout(releaseTimer.current);
-        endPull(); // fully armed → commit immediately
+        endPull(); // fully armed → commit immediately (deliberate only)
       } else {
         scheduleRelease();
       }
@@ -191,11 +210,12 @@ export default function OverscrollController() {
       }
       if (!pulling.current) {
         if (!canStart()) return;
-        // A pull must START from a distinct gesture. Trackpad momentum (the
-        // inertia tail of the scroll that carried the page to the bottom)
-        // streams events with no gap, so it can never engage — only a pull
-        // that begins after a beat of wheel silence does.
-        if (sinceLastWheel < WHEEL_STREAM_GAP) return;
+        // Classify this fresh pull: DELIBERATE only if it begins after a beat of
+        // wheel silence AND the page has settled at the bottom. Otherwise it's
+        // the inertia tail of the scroll that carried us here — allowed to
+        // nudge the warp, but attenuated + capped so it can't commit.
+        momentumOnly.current =
+          sinceLastWheel < WHEEL_STREAM_GAP || !dwellMet();
       }
       ensureAudio();
       e.preventDefault();
@@ -215,7 +235,12 @@ export default function OverscrollController() {
       lastTouchY.current = y;
 
       if (delta > 0) {
-        if (!pulling.current && !canStart()) return;
+        if (!pulling.current) {
+          if (!canStart()) return;
+          // A finger drag is always deliberate — inertia scrolling emits no
+          // touchmove, so there's no momentum tail to attenuate here.
+          momentumOnly.current = false;
+        }
         ensureAudio();
         e.preventDefault();
         beginPull();

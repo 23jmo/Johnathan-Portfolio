@@ -7,23 +7,38 @@ export type ScrollChatPhase = "idle" | "warping" | "chat" | "reversing";
 export const GESTURE_THRESHOLD = 1000;
 
 /**
- * A pull can only BEGIN after this many ms of wheel silence. Trackpad momentum
- * (the "let go" inertia tail of the scroll that brought you to the bottom)
- * streams events continuously at ~16ms intervals, so requiring a quiet gap
- * means arriving at the bottom with leftover inertia never auto-engages the
- * gesture — only a distinct, deliberate second pull does. Touch is unaffected:
- * touchmove only fires with a finger down, and inertia scrolling emits none.
+ * A pull is DELIBERATE (full strength) only if it begins after this much wheel
+ * silence. Trackpad momentum (the "let go" inertia tail of the scroll that
+ * brought you to the bottom) streams events continuously at ~16ms intervals, so
+ * a pull that starts inside a live stream is classified as momentum and fed at
+ * a reduced rate (see MOMENTUM_*). Touch is always deliberate: touchmove only
+ * fires with a finger down, and inertia scrolling emits none.
  */
 export const WHEEL_STREAM_GAP = 150;
 
 /**
- * The page must have been AT the bottom for this long before a pull can arm.
- * Complements WHEEL_STREAM_GAP: the gap check blocks a steady momentum tail,
- * but a single timing hiccup >150ms mid-tail would slip one event through and
- * open the budget. Dwell is immune to hiccups — the scroll that CARRIED you to
- * the bottom can never also start the pull, because arrival resets the clock.
+ * A pull is DELIBERATE only if the page has also settled at the bottom this
+ * long. Complements WHEEL_STREAM_GAP: the gap classifies a steady tail, but a
+ * single timing hiccup >150ms mid-tail would misread one event as deliberate.
+ * Dwell is immune to hiccups — the scroll that CARRIED you to the bottom can't
+ * masquerade as a deliberate pull, because arrival resets the clock.
  */
 export const BOTTOM_DWELL_MS = 250;
+
+/**
+ * Momentum (an inertia tail arriving at the bottom) is no longer blocked — it
+ * still nudges the warp, just gently. Its wheel deltas feed the gesture budget
+ * at this fraction of a deliberate pull's, so leftover scroll gives a small
+ * elastic response instead of nothing.
+ */
+export const MOMENTUM_ATTENUATION = 0.2;
+
+/**
+ * Hard ceiling on how far momentum alone can drive progress (0..1). Kept safely
+ * below COMMIT_RATIO so an inertia tail can bulge the page a little but can
+ * never form the sphere or commit — only a deliberate pull crosses the line.
+ */
+export const MOMENTUM_PROGRESS_CAP = 0.4;
 
 /** Fraction of the threshold at which releasing commits into the chat. */
 export const COMMIT_RATIO = 0.55;
