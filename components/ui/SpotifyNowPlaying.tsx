@@ -127,6 +127,9 @@ export default function SpotifyNowPlaying() {
         const res = await fetch("/api/spotify/now-playing");
         if (res.ok) {
           const result: SpotifyData = await res.json();
+          // Ignore any payload missing `current` (e.g. a stale/error shape) so
+          // we never store data the render path can't safely read.
+          if (!result?.current) return;
           setData(result);
           setImgError(false);
           setPrevImgError(false);
@@ -150,7 +153,7 @@ export default function SpotifyNowPlaying() {
     };
   }, [startProgressInterpolation]);
 
-  if (!data || (!data.current.isPlaying && !data.current.title)) {
+  if (!data?.current || (!data.current.isPlaying && !data.current.title)) {
     return null;
   }
 
