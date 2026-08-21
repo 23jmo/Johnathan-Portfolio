@@ -286,6 +286,9 @@ export default function ScrollChatProvider({
 
       let textBuffer = "";
       let rafScheduled = false;
+      // Survives flushes, unlike textBuffer, so an error arriving mid-answer
+      // can tell whether the visitor already sees partial text.
+      let streamedText = "";
 
       const flush = () => {
         rafScheduled = false;
@@ -351,10 +354,13 @@ export default function ScrollChatProvider({
               }
 
               switch (event.type) {
-                case "text":
-                  textBuffer += String(event.value ?? "");
+                case "text": {
+                  const delta = String(event.value ?? "");
+                  textBuffer += delta;
+                  streamedText += delta;
                   scheduleFlush();
                   break;
+                }
                 case "citation": {
                   const citation: Citation = {
                     n: Number(event.n),
@@ -384,10 +390,16 @@ export default function ScrollChatProvider({
                     ],
                   }));
                   break;
-                case "error":
-                  textBuffer += `\n\n_(${String(event.message)})_`;
+                case "error": {
+                  // The route sends visitor-safe prose (never raw provider
+                  // JSON). Lead with it when nothing streamed; otherwise
+                  // append it as an aside after the partial answer.
+                  const notice = String(event.message);
+                  const hasPartialAnswer = streamedText.trim().length > 0;
+                  textBuffer += hasPartialAnswer ? `\n\n_${notice}_` : notice;
                   scheduleFlush();
                   break;
+                }
                 case "done":
                 default:
                   break;

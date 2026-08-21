@@ -1,37 +1,31 @@
-import Dedalus from "dedalus-labs";
+import OpenAI from "openai";
 import { buildSystemPrompt } from "@/lib/scrollchat/systemPrompt";
 import { getSource } from "@/lib/scrollchat/sources";
+import {
+  checkRateLimit,
+  getClientIdentifier,
+} from "@/lib/scrollchat/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Dedalus model ids are dash-separated (e.g. `claude-sonnet-4-6`, NOT
-// `claude-sonnet-4.6`). A dotted id resolves to no pricing row and Dedalus
-// returns a misleading `unpriced_model` 400. Override via env without a redeploy.
-const MODEL = process.env.DEDALUS_MODEL || "anthropic/claude-sonnet-4-6";
+// Overridable without a redeploy. `gpt-5.6-luna` is the cheapest tier that still
+// drives the tool loop reliably (~25x cheaper per turn than gpt-5.5), which
+// matters because this endpoint is public and every question costs real money.
+// Bump to `gpt-5.6-terra` or `gpt-5.5` via env if answer quality regresses.
+const MODEL = process.env.OPENAI_MODEL || "gpt-5.6-luna";
 const MAX_TOOL_STEPS = 6;
 
-/* ── Minimal structural types for the OpenAI-compatible stream ──────────── */
-interface DeltaToolCall {
-  index: number;
-  id?: string;
-  function?: { name?: string; arguments?: string };
-}
-interface ChunkChoice {
-  delta?: { content?: string | null; tool_calls?: DeltaToolCall[] };
-  finish_reason?: string | null;
-}
-interface StreamChunkLike {
-  choices?: ChunkChoice[];
-}
+type ChatMessageParam = OpenAI.Chat.Completions.ChatCompletionMessageParam;
+type ChatChunk = OpenAI.Chat.Completions.ChatCompletionChunk;
 
 interface IncomingMessage {
   role: "user" | "assistant";
   content: string;
 }
 
-/** Tool schemas advertised to the model (OpenAI function-tool format). */
-const TOOLS = [
+/** Tool schemas advertised to the model. */
+const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: "function",
     function: {
@@ -96,6 +90,40 @@ function sse(data: unknown): string {
   return `data: ${JSON.stringify(data)}\n\n`;
 }
 
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream; charset=utf-8",
+  "Cache-Control": "no-cache, no-transform",
+  Connection: "keep-alive",
+} as const;
+
+/**
+ * Reject an over-limit caller.
+ *
+ * This deliberately answers with an SSE body rather than plain JSON: the client
+ * never inspects `res.ok`, it goes straight to `res.body` and parses events, so
+ * a JSON error would be swallowed by its parse guard and render as a silently
+ * empty reply. The 429 status and Retry-After are still set for anything that
+ * does read them (bots, monitoring, the browser's network panel).
+ */
+function rateLimitedResponse(retryAfterSeconds: number): Response {
+  const waitDescription =
+    retryAfterSeconds > 60
+      ? "in a few minutes"
+      : `in about ${retryAfterSeconds} second${retryAfterSeconds === 1 ? "" : "s"}`;
+
+  const body =
+    sse({
+      type: "error",
+      message: `Whoa — that's a lot of questions at once. Give me a breather and try again ${waitDescription}.`,
+      retryable: true,
+    }) + sse({ type: "done" });
+
+  return new Response(body, {
+    status: 429,
+    headers: { ...SSE_HEADERS, "Retry-After": String(retryAfterSeconds) },
+  });
+}
+
 /** Fetch Johnathan's latest longform videos by reusing the existing endpoint. */
 async function fetchYouTube(origin: string): Promise<unknown[]> {
   try {
@@ -110,8 +138,100 @@ async function fetchYouTube(origin: string): Promise<unknown[]> {
   }
 }
 
+/**
+ * Failures that are worth retrying: the provider is momentarily overloaded,
+ * rate-limited, or the connection dropped. A 4xx that isn't 408/409/429 means
+ * the request itself is wrong, so retrying just burns time.
+ */
+function isTransientUpstreamError(error: unknown): boolean {
+  const status = (error as { status?: unknown })?.status;
+  if (typeof status === "number") {
+    return status === 408 || status === 409 || status === 429 || status >= 500;
+  }
+  // Connection/timeout errors carry no status but are retryable.
+  return (
+    error instanceof Error &&
+    /timeout|network|connection|fetch failed/i.test(error.message)
+  );
+}
+
+/**
+ * Visitor-facing copy. Provider error bodies are raw JSON that leaks internals
+ * (and reads as a crash), so they never reach the chat bubble — the real error
+ * is logged server-side instead.
+ */
+function describeErrorForVisitor(error: unknown): string {
+  const status = (error as { status?: unknown })?.status;
+  if (status === 429) {
+    return "I'm getting a lot of questions right now — give me a few seconds and ask again.";
+  }
+  if (status === 401 || status === 403) {
+    return "My AI brain isn't authenticated right now. Johnathan's been pinged — in the meantime, have a look around the site.";
+  }
+  if (isTransientUpstreamError(error)) {
+    return "My model provider is having a moment. Try that again in a few seconds — it usually clears up fast.";
+  }
+  return "Something went wrong on my end. Try asking again?";
+}
+
+const RETRY_BACKOFF_MS = [700, 1800, 4000];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Open an upstream completion stream, retrying transient failures with backoff.
+ * Only the *opening* handshake is retried — once tokens have been forwarded to
+ * the browser, a retry would duplicate visible text.
+ */
+async function openCompletionStream(
+  client: OpenAI,
+  messages: ChatMessageParam[]
+): Promise<AsyncIterable<ChatChunk>> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= RETRY_BACKOFF_MS.length; attempt++) {
+    try {
+      return await client.chat.completions.create({
+        model: MODEL,
+        stream: true,
+        tools: TOOLS,
+        messages,
+        // Required, not merely an optimization: the gpt-5.6 family rejects
+        // function tools on /v1/chat/completions with a 400 unless reasoning is
+        // switched off. gpt-5.5 accepts it too, so this keeps OPENAI_MODEL
+        // freely swappable. This workload is grounded lookup, not deduction —
+        // measured reasoning usage was near zero even when it was allowed.
+        reasoning_effort: "none",
+      });
+    } catch (error) {
+      lastError = error;
+      const canRetry =
+        attempt < RETRY_BACKOFF_MS.length && isTransientUpstreamError(error);
+      if (!canRetry) break;
+      console.warn(
+        `[chat] transient upstream error (attempt ${attempt + 1}), retrying`,
+        error instanceof Error ? error.message : error
+      );
+      await sleep(RETRY_BACKOFF_MS[attempt]);
+    }
+  }
+
+  throw lastError;
+}
+
 export async function POST(request: Request) {
-  const apiKey = process.env.DEDALUS_API_KEY;
+  // Checked first: rejecting costs nothing, and every step past here either
+  // parses attacker-controlled input or spends money at the provider.
+  const clientId = getClientIdentifier(request);
+  const rateLimit = checkRateLimit(clientId);
+  if (!rateLimit.allowed) {
+    console.warn(
+      `[chat] rate limited ${clientId} on "${rateLimit.violatedRule?.label}" rule`
+    );
+    return rateLimitedResponse(rateLimit.retryAfterSeconds);
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
   const origin = new URL(request.url).origin;
 
   let body: {
@@ -133,7 +253,8 @@ export async function POST(request: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (data: unknown) => controller.enqueue(encoder.encode(sse(data)));
+      const send = (data: unknown) =>
+        controller.enqueue(encoder.encode(sse(data)));
 
       // Graceful degradation when the key isn't provisioned yet.
       if (!apiKey) {
@@ -147,10 +268,12 @@ export async function POST(request: Request) {
         return;
       }
 
-      const client = new Dedalus({ apiKey });
+      // The SDK retries 5xx/429 internally; `openCompletionStream` adds a
+      // second, slower layer on top for longer provider brownouts.
+      const client = new OpenAI({ apiKey, maxRetries: 3 });
 
       // Conversation state, seeded with the grounding system prompt.
-      const convo: Array<Record<string, unknown>> = [
+      const convo: ChatMessageParam[] = [
         { role: "system", content: buildSystemPrompt(userName) },
       ];
       if (pageContext?.title) {
@@ -165,18 +288,7 @@ export async function POST(request: Request) {
 
       try {
         for (let step = 0; step < MAX_TOOL_STEPS; step++) {
-          const createParams = {
-            model: MODEL,
-            stream: true,
-            tools: TOOLS,
-            messages: convo,
-          };
-
-          const upstream = (await client.chat.completions.create(
-            createParams as unknown as Parameters<
-              typeof client.chat.completions.create
-            >[0]
-          )) as unknown as AsyncIterable<StreamChunkLike>;
+          const upstream = await openCompletionStream(client, convo);
 
           let assistantText = "";
           const toolCalls = new Map<
@@ -196,8 +308,11 @@ export async function POST(request: Request) {
             }
 
             for (const tc of choice.delta?.tool_calls ?? []) {
-              const existing =
-                toolCalls.get(tc.index) ?? { id: "", name: "", args: "" };
+              const existing = toolCalls.get(tc.index) ?? {
+                id: "",
+                name: "",
+                args: "",
+              };
               if (tc.id) existing.id = tc.id;
               if (tc.function?.name) existing.name = tc.function.name;
               if (tc.function?.arguments) existing.args += tc.function.arguments;
@@ -217,7 +332,7 @@ export async function POST(request: Request) {
             content: assistantText || null,
             tool_calls: calls.map((c) => ({
               id: c.id,
-              type: "function",
+              type: "function" as const,
               function: { name: c.name, arguments: c.args || "{}" },
             })),
           });
@@ -247,7 +362,10 @@ export async function POST(request: Request) {
                 });
                 toolResult = { ok: true, marker: `[${citationCounter}]` };
               } else {
-                toolResult = { ok: false, error: `unknown source id: ${sourceId}` };
+                toolResult = {
+                  ok: false,
+                  error: `unknown source id: ${sourceId}`,
+                };
               }
             } else if (call.name === "render_youtube") {
               const videos = await fetchYouTube(origin);
@@ -261,7 +379,8 @@ export async function POST(request: Request) {
               send({ type: "youtube", videos: selected });
               toolResult = { ok: true, count: selected.length };
             } else if (call.name === "render_a2ui") {
-              const surface = typeof args.surface === "string" ? args.surface : "";
+              const surface =
+                typeof args.surface === "string" ? args.surface : "";
               if (surface) send({ type: "a2ui", surface });
               toolResult = { ok: Boolean(surface) };
             } else {
@@ -283,10 +402,12 @@ export async function POST(request: Request) {
 
         send({ type: "done" });
       } catch (error) {
+        // Log the real provider payload for debugging; show the visitor prose.
+        console.error("[chat] upstream failure", error);
         send({
           type: "error",
-          message:
-            error instanceof Error ? error.message : "Something went wrong.",
+          message: describeErrorForVisitor(error),
+          retryable: isTransientUpstreamError(error),
         });
       } finally {
         controller.close();
@@ -294,11 +415,5 @@ export async function POST(request: Request) {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-    },
-  });
+  return new Response(stream, { headers: SSE_HEADERS });
 }
