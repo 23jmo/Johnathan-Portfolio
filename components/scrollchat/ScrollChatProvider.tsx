@@ -48,6 +48,17 @@ interface ScrollChatContextValue {
    * so the Apple-Intelligence border feels alive and responsive.
    */
   glowPulse: MotionValue<number>;
+  /**
+   * 0 = cold, 1 = armed. Raised by `OverscrollController` while the visitor is
+   * within `GESTURE_ARM_GAP` of the footer (and held up for the whole gesture +
+   * chat session), so the warp and the screen glow can pre-promote their GPU
+   * layers BEFORE the pull rather than allocating them on its first frame.
+   *
+   * Deliberately a MotionValue, not React state: arming toggles every time the
+   * visitor reaches or leaves the footer, and a state flip here would re-render
+   * the entire provider subtree — trading a compositing hitch for a render one.
+   */
+  armed: MotionValue<number>;
   pageContext: PageContext | null;
   reducedMotion: boolean;
   /** Commit the gesture (or the "Ask my AI" button) → warp into the chat. */
@@ -90,6 +101,7 @@ export default function ScrollChatProvider({
   const progress = useMotionValue(0);
   const fly = useMotionValue(0);
   const glowPulse = useMotionValue(0);
+  const armed = useMotionValue(0);
 
   const [phase, setPhase] = useState<ScrollChatPhase>("idle");
   const [pageContext, setPageContext] = useState<PageContext | null>(null);
@@ -501,6 +513,7 @@ export default function ScrollChatProvider({
         progress,
         fly,
         glowPulse,
+        armed,
         pageContext,
         reducedMotion,
         open,

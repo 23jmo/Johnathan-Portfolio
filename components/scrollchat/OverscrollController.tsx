@@ -7,6 +7,7 @@ import {
   ARM_ACCENT_RESET_RATIO,
   BOTTOM_DWELL_MS,
   COMMIT_RATIO,
+  GESTURE_ARM_GAP,
   GESTURE_THRESHOLD,
   MOMENTUM_ATTENUATION,
   MOMENTUM_PROGRESS_CAP,
@@ -27,11 +28,20 @@ const RELEASE_MS = 110;
  *  - Accumulates a px budget → progress = budget / THRESHOLD (clamped 0..1).
  *  - On release: commits into the chat if progress ≥ COMMIT_RATIO, otherwise
  *    springs progress back to 0 with a snappy little bounce.
- *  - Pre-warms the warp snapshot while the visitor nears the footer so the
- *    effect starts without a capture hitch.
+ *  - ARMS while the visitor is within GESTURE_ARM_GAP of the footer. Arming is
+ *    purely a cost-scheduling boundary — it changes nothing about how the
+ *    gesture behaves once it fires:
+ *      · the non-passive `wheel`/`touchmove` listeners exist ONLY while armed,
+ *        so the rest of the site keeps Chrome's passive-scroll fast path (a
+ *        permanently-registered non-passive wheel listener opts the WHOLE
+ *        document out of it, on every page, forever);
+ *      · it raises the shared `armed` MotionValue, which `PageWarp` and
+ *        `ScreenGlow` use to pre-promote their GPU layers before the pull;
+ *      · it builds the AudioContext, so the first wheel event of a gesture
+ *        never pays for it.
  */
 export default function OverscrollController() {
-  const { phase, progress, open, reducedMotion } = useScrollChat();
+  const { phase, progress, open, reducedMotion, armed } = useScrollChat();
 
   const budget = useRef(0);
   const lastTouchY = useRef<number | null>(null);
@@ -87,13 +97,15 @@ export default function OverscrollController() {
     // Driven by scroll events (covers wheel, keyboard, scrollbar, and touch
     // inertia arrivals alike) + run once for a page that loads at the bottom.
     const trackBottom = () => {
-      if (atBottom()) {
+      // One layout read per event, shared by the dwell stamp and the arm check.
+      const bottomGap = docBottomGap();
+      if (bottomGap <= 2) {
         if (bottomSince.current === null) bottomSince.current = performance.now();
       } else {
         bottomSince.current = null;
       }
+      syncArmed(bottomGap);
     };
-    trackBottom();
 
     // A pull may start any time we're idle + past cooldown + at the bottom.
     // Momentum is no longer blocked here — it's classified in onWheel and fed
@@ -230,7 +242,15 @@ export default function OverscrollController() {
 
     const onTouchMove = (e: TouchEvent) => {
       const y = e.touches[0]?.clientY ?? null;
-      if (y === null || lastTouchY.current === null) return;
+      if (y === null) return;
+      if (lastTouchY.current === null) {
+        // No anchor yet — either no touch is in progress, or this handler was
+        // attached PART-WAY through a drag (the visitor scrolled into the arm
+        // window with a finger down). Re-seed from here rather than measuring
+        // against a stale anchor, which would inject one huge delta.
+        lastTouchY.current = y;
+        return;
+      }
       const delta = lastTouchY.current - y; // + when dragging up (scroll down)
       lastTouchY.current = y;
 
@@ -262,22 +282,81 @@ export default function OverscrollController() {
       }
     };
 
-    window.addEventListener("wheel", onWheel, { passive: false });
+    // The two handlers that must call preventDefault — and therefore must be
+    // registered non-passive — live ONLY inside the arm window. A non-passive
+    // wheel listener on `window` disables Chrome's passive-scroll fast path for
+    // the entire document, so registering one permanently taxes every scroll on
+    // every page, including the ones the visitor never gestures on.
+    let gestureListenersHot = false;
+
+    const attachGestureListeners = () => {
+      if (gestureListenersHot) return;
+      gestureListenersHot = true;
+      window.addEventListener("wheel", onWheel, { passive: false });
+      window.addEventListener("touchmove", onTouchMove, { passive: false });
+    };
+
+    const detachGestureListeners = () => {
+      if (!gestureListenersHot) return;
+      gestureListenersHot = false;
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchmove", onTouchMove);
+      // A drag that resumes after a re-attach must re-seed its own anchor.
+      lastTouchY.current = null;
+    };
+
+    // Built once, at arm time. The AudioContext was already lazy, but "lazy"
+    // meant "on the first wheel event OF the gesture" — squarely on the
+    // critical path. Constructing it here keeps that cost off the first frame;
+    // the existing ensureAudio() calls in the handlers still resume it.
+    let audioPrewarmed = false;
+
+    const setArmed = (value: number) => {
+      if (armed.get() !== value) armed.set(value);
+    };
+
+    function syncArmed(bottomGap: number) {
+      // Stay armed for the whole gesture and chat session: the body is
+      // scroll-locked there, so no scroll event would arrive to re-arm us.
+      const shouldArm =
+        pulling.current ||
+        phaseRef.current !== "idle" ||
+        bottomGap <= GESTURE_ARM_GAP;
+
+      if (!shouldArm) {
+        detachGestureListeners();
+        setArmed(0);
+        return;
+      }
+      attachGestureListeners();
+      if (!audioPrewarmed) {
+        audioPrewarmed = true;
+        ensureAudio();
+      }
+      setArmed(1);
+    }
+
+    // Arm immediately for a page that already loads at (or near) the bottom.
+    trackBottom();
+
     window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("touchend", onTouchEnd, { passive: true });
     window.addEventListener("scroll", trackBottom, { passive: true });
+    // Resize changes the bottom gap without a scroll event; without this the
+    // gesture would stay disarmed until the visitor scrolled again.
+    window.addEventListener("resize", trackBottom, { passive: true });
 
     return () => {
-      window.removeEventListener("wheel", onWheel);
+      detachGestureListeners();
       window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("scroll", trackBottom);
+      window.removeEventListener("resize", trackBottom);
       if (releaseTimer.current) clearTimeout(releaseTimer.current);
       stopSpring();
+      armed.set(0);
     };
-  }, [open, progress, reducedMotion]);
+  }, [open, progress, reducedMotion, armed]);
 
   return null;
 }

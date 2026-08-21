@@ -20,29 +20,42 @@ export default function CustomCursor() {
       cursor.style.top = `${e.clientY - 6}px`;
     };
 
-    const addHover = () => cursor.classList.add("hovering");
-    const removeHover = () => cursor.classList.remove("hovering");
+    // Hover is DELEGATED to the document rather than bound per element.
+    // Binding per element needed a MutationObserver to catch new nodes, and
+    // that observer re-ran a document-wide querySelectorAll on every unrelated
+    // mutation and re-added mouseenter/mouseleave WITHOUT removing the previous
+    // pair — so listeners accumulated for the life of the page, fastest exactly
+    // when the DOM churns most (e.g. the scroll-chat swapping its entry button
+    // out as the phase flips). Delegation is three listeners, total, forever:
+    // elements added later are covered because nothing is bound to them.
+    //
+    // mouseover/mouseout (not mouseenter/mouseleave) because only these bubble.
+    const INTERACTIVE_SELECTOR = "a, button, [role='button']";
 
-    document.addEventListener("mousemove", moveCursor);
+    const isInsideInteractive = (node: EventTarget | null) =>
+      node instanceof Element && !!node.closest(INTERACTIVE_SELECTOR);
 
-    const attachHoverListeners = () => {
-      const interactiveElements = document.querySelectorAll(
-        "a, button, [role='button']"
-      );
-      interactiveElements.forEach((el) => {
-        el.addEventListener("mouseenter", addHover);
-        el.addEventListener("mouseleave", removeHover);
-      });
+    const onPointerOver = (e: MouseEvent) => {
+      if (isInsideInteractive(e.target)) cursor.classList.add("hovering");
     };
 
-    attachHoverListeners();
+    const onPointerOut = (e: MouseEvent) => {
+      // Moving between two children of the SAME link/button still fires
+      // mouseout; only drop the state when the pointer has actually left every
+      // interactive ancestor.
+      if (!isInsideInteractive(e.target)) return;
+      if (isInsideInteractive(e.relatedTarget)) return;
+      cursor.classList.remove("hovering");
+    };
 
-    const observer = new MutationObserver(attachHoverListeners);
-    observer.observe(document.body, { childList: true, subtree: true });
+    document.addEventListener("mousemove", moveCursor);
+    document.addEventListener("mouseover", onPointerOver);
+    document.addEventListener("mouseout", onPointerOut);
 
     return () => {
       document.removeEventListener("mousemove", moveCursor);
-      observer.disconnect();
+      document.removeEventListener("mouseover", onPointerOver);
+      document.removeEventListener("mouseout", onPointerOut);
     };
   }, []);
 
