@@ -37,7 +37,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${figtree.variable} font-sans antialiased`}>
+      {/* suppressHydrationWarning: browser extensions (e.g. Grammarly) inject
+          data-gr-* attributes onto <body> before React hydrates, which the
+          server HTML never had. The flag only covers one level deep, so the
+          one on <html> doesn't reach here — <body> needs its own. */}
+      <body
+        suppressHydrationWarning
+        className={`${figtree.variable} font-sans antialiased`}
+      >
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
