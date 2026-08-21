@@ -43,6 +43,25 @@ export const MOMENTUM_PROGRESS_CAP = 0.4;
 /** Fraction of the threshold at which releasing commits into the chat. */
 export const COMMIT_RATIO = 0.55;
 
+/**
+ * Distance (px) from the document bottom at which the gesture ARMS. Arming is
+ * NOT a gesture threshold — firing still requires `atBottom()` (gap <= 2px) and
+ * the same dwell/commit rules as before. Arming only decides WHEN the feature is
+ * allowed to be expensive:
+ *
+ *  - the non-passive `wheel`/`touchmove` listeners attach only inside this
+ *    window, so the rest of the site keeps Chrome's passive-scroll fast path;
+ *  - the warp's glass filter and the screen glow pre-promote their GPU layers
+ *    here, so the compositing cost is paid BEFORE the gesture instead of on its
+ *    first frame.
+ *
+ * Sized as a short lead-in rather than a full viewport: long enough that the
+ * wheel handler has already seen several events (and `lastWheelAt` is warm)
+ * before the bottom is reached, short enough that the pre-promoted layers only
+ * exist while the visitor is effectively standing at the footer.
+ */
+export const GESTURE_ARM_GAP = 240;
+
 /** Cooldown after closing before the overscroll gesture can re-arm, in ms. */
 export const REARM_COOLDOWN = 600;
 

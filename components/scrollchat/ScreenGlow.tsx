@@ -8,6 +8,19 @@ import {
 import { useScrollChat } from "./ScrollChatProvider";
 
 /**
+ * Opacity the frame is held at while the gesture is merely ARMED — enough to
+ * force Blink to paint (and therefore allocate + rasterize) the two stacked
+ * full-viewport blurred conic layers, so that allocation is not still pending
+ * when `reveal` lifts them into view mid-gesture.
+ *
+ * Chrome composites to 8-bit channels, so this contributes at most 0.001 x 255
+ * = 0.26 of one level and rounds away to nothing: the frame is exactly as
+ * invisible as it was at opacity 0, and its visible ramp still starts at
+ * progress 0.4 (Math.max never lowers `reveal`).
+ */
+const ARMED_PREWARM_OPACITY = 0.001;
+
+/**
  * The "Apple Intelligence" frame: a soft, hue-cycling glow that hugs all four
  * edges (and especially the corners) of the VIEWPORT while AI mode is engaged.
  *
@@ -22,10 +35,24 @@ import { useScrollChat } from "./ScrollChatProvider";
  * intercepting input.
  */
 export default function ScreenGlow() {
-  const { progress, glowPulse, phase, reducedMotion } = useScrollChat();
+  const {
+    progress,
+    glowPulse,
+    phase,
+    reducedMotion,
+    // Renamed: `armed` already means the brightness ramp in this file.
+    armed: gestureArmed,
+  } = useScrollChat();
 
   // Overall presence: fades in over the back half of the pull, full in chat.
   const reveal = useTransform(progress, [0.4, 1], [0, 1]);
+  // ...held off zero while armed, so the layer already exists by the time the
+  // pull crosses 0.4. Pre-promotion only; the visible ramp is untouched.
+  const revealPrewarmed = useTransform(
+    [reveal, gestureArmed],
+    ([revealed, isGestureArmed]: number[]) =>
+      Math.max(revealed, isGestureArmed > 0 ? ARMED_PREWARM_OPACITY : 0)
+  );
   // "Armed" accent: the bright layer steps up once the pull crosses the commit
   // threshold, then releases toward progress=1 so it never permanently washes
   // out the typing flash once in chat.
@@ -52,7 +79,7 @@ export default function ScreenGlow() {
   return (
     <motion.div
       aria-hidden
-      style={{ opacity: reveal }}
+      style={{ opacity: revealPrewarmed }}
       className="pointer-events-none fixed inset-0 z-[9998]"
     >
       {/* -inset-2 so the outer blur doesn't clip at the viewport edge. */}

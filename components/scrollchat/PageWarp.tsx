@@ -234,7 +234,7 @@ interface Region {
 }
 
 export default function PageWarp({ children }: { children: ReactNode }) {
-  const { progress, fly, phase, reducedMotion } = useScrollChat();
+  const { progress, fly, phase, reducedMotion, armed } = useScrollChat();
   const pathname = usePathname();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const clipRef = useRef<HTMLDivElement>(null);
@@ -255,6 +255,10 @@ export default function PageWarp({ children }: { children: ReactNode }) {
   // it reads as a physical lens, not just a distortion. Refraction bends pixels;
   // this adds the material. Positioned/scaled to the circle every frame.
   const sheenRef = useRef<HTMLDivElement>(null);
+  // The pre-warm decoy that carries the glass filter while the gesture is only
+  // ARMED, so Blink allocates the filtered surface before the pull (see the
+  // pre-warm effect below).
+  const prewarmRef = useRef<HTMLDivElement>(null);
   // Latest clearStyles from the warp effect, callable by the phase failsafe.
   const clearStylesRef = useRef<(() => void) | null>(null);
   // Mirror of `region` readable inside the imperative warp loop without it
@@ -284,8 +288,20 @@ export default function PageWarp({ children }: { children: ReactNode }) {
     setRegion(next);
     if (!mapBuiltRef.current) {
       mapBuiltRef.current = true;
-      setMapUri(buildGlassMap());
-      setBlurMaskUri(buildBlurMask());
+      const glassMapUri = buildGlassMap();
+      const rimMaskUri = buildBlurMask();
+      setMapUri(glassMapUri);
+      setBlurMaskUri(rimMaskUri);
+      // Decode both PNGs NOW. `<feImage href>` would otherwise decode them the
+      // first time the filter actually runs — i.e. inside the gesture's first
+      // frame. They're data URIs, so this warms the same memory-cache entry the
+      // filter will resolve, at a moment where a decode costs nothing.
+      for (const dataUri of [glassMapUri, rimMaskUri]) {
+        if (!dataUri) continue;
+        const warmImage = new Image();
+        warmImage.src = dataUri;
+        void warmImage.decode().catch(() => {});
+      }
     }
   };
 
@@ -609,6 +625,52 @@ export default function PageWarp({ children }: { children: ReactNode }) {
     if (phase === "idle") clearStylesRef.current?.();
   }, [phase]);
 
+  // PRE-WARM the glass filter while the gesture is only ARMED.
+  //
+  // Attaching `filter: url(#scrollchat-fisheye)` for the first time forces Blink
+  // to build the filter graph, resolve + upload the two <feImage> maps, and
+  // allocate a filter surface the size of the filter region — synchronously, on
+  // the main thread. Doing that on the first frame of the pull IS the hitch.
+  //
+  // The decoy carries the filter instead, ahead of time. `filterUnits` is
+  // userSpaceOnUse with an explicit region, so the region — and therefore the
+  // surface Blink allocates — is the same whether the filter hangs off the
+  // page-sized content layer or off a 1px decoy.
+  //
+  // It is handed BACK the instant the pull starts: the decoy shares the one
+  // <filter> element, whose nodes apply() rewrites every frame, so leaving it
+  // attached would re-rasterize a second region-sized surface per frame.
+  const filterReady = !!(region && mapUri);
+  useEffect(() => {
+    if (reducedMotion || !filterReady) return;
+    const decoy = prewarmRef.current;
+    if (!decoy) return;
+
+    let warmAttached = false;
+    const syncPrewarm = () => {
+      const shouldWarm =
+        armed.get() > 0 && progress.get() <= 0.0008 && fly.get() <= 0.0008;
+      if (shouldWarm === warmAttached) return;
+      warmAttached = shouldWarm;
+      decoy.style.filter = shouldWarm ? "url(#scrollchat-fisheye)" : "";
+      // Blink can skip a filter whose source paints nothing, so the decoy needs
+      // SOME ink — one pixel at 0.4% alpha, which is below an 8-bit level and
+      // rounds away. Removed again when cold, so at rest it paints nothing.
+      decoy.style.background = shouldWarm ? "rgba(0,0,0,0.004)" : "";
+    };
+
+    syncPrewarm();
+    const unsubArmed = armed.on("change", syncPrewarm);
+    const unsubProgress = progress.on("change", syncPrewarm);
+
+    return () => {
+      unsubArmed();
+      unsubProgress();
+      decoy.style.filter = "";
+      decoy.style.background = "";
+    };
+  }, [armed, progress, fly, reducedMotion, filterReady]);
+
   if (reducedMotion) {
     return (
       <>
@@ -787,6 +849,30 @@ export default function PageWarp({ children }: { children: ReactNode }) {
           }}
         />
       </div>
+
+      {/* PRE-WARM decoy — see the pre-warm effect above. Deliberately NOT the
+          page layers: `filter` (and `will-change: filter/transform`) makes an
+          element a containing block for `position: fixed` descendants, and the
+          page tree has one (`ThemeToggle`), so pre-attaching the filter there
+          would re-base it out of the viewport. This element has no descendants
+          at all, so it can carry the filter harmlessly.
+
+          While warming it paints a single 0.4%-alpha pixel (see the effect);
+          at rest it paints nothing at all. `position: fixed` also keeps the
+          filter's ink overflow out of the document's scrollable overflow. */}
+      <div
+        ref={prewarmRef}
+        data-warp-prewarm
+        aria-hidden
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: 1,
+          height: 1,
+          pointerEvents: "none",
+        }}
+      />
     </>
   );
 }
