@@ -66,7 +66,7 @@ export default function MessageList({ messages, isStreaming }: MessageListProps)
   return (
     <div
       ref={listRef}
-      className="flex-1 overflow-y-auto"
+      className="no-scrollbar flex-1 overflow-y-auto"
       aria-live="polite"
       aria-atomic="false"
     >

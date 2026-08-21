@@ -40,13 +40,14 @@ import { CHIP_DIAMETER, CHIP_CENTER_FROM_BOTTOM } from "@/lib/scrollchat/chip";
  *
  * The displacement gradient AT THE RIM is REFRACT × GLASS_RIM_EXP, and the
  * magnification folds into a doubled "echo" once that gradient passes 1. At the
- * current 0.78 × 2.0 ≈ 1.56 the rim is deliberately PAST that caustic, so the
- * outermost ring folds into a bright glass MENISCUS (the dramatic ~5× edge),
- * while the interior of the band (lower gradient) still magnifies as a single
- * clean image. REFRACT also sets the absolute pixel displacement (r×BEZEL×
- * REFRACT), so it's kept high to pull content far, not merely stretch it.
+ * current 0.88 × 2.6 ≈ 2.29 the rim is driven FAR past that caustic, so the
+ * outermost ring folds MULTIPLE times — content smears into CONCENTRIC bands
+ * that wrap the silhouette (right next to the edge), while the interior of the
+ * band (lower gradient) still magnifies as a single clean image. REFRACT also
+ * sets the absolute pixel displacement (r×BEZEL×REFRACT), so it's kept high to
+ * pull content far, not merely stretch it.
  */
-const GLASS_REFRACT = 0.78;
+const GLASS_REFRACT = 0.88;
 
 /** How far the page rubber-band-lifts at full pull, as a fraction of viewport.
  *  Modest now — the dominant motion is the ball-up, not the lift — and it eases
@@ -90,13 +91,25 @@ const GLASS_BEZEL = 0.5;
  *     just under the caustic → no fold anywhere).
  *   - HIGHER concentrates the bend into the outermost ring: the interior of the
  *     band stays gentle while the very rim spikes WAY past the caustic into a
- *     tight fold — a genuine glass MENISCUS edge that wraps + compresses content
- *     into a bright band right at the silhouette (dramatically stronger edge),
- *     while the fold stays a thin ring so it never doubles readable body text.
- * The rim gradient is RIM_EXP × REFRACT; at 2.0 × 0.78 ≈ 1.56 the outermost
- * ~15% of the radius folds into that meniscus, the rest magnifies cleanly.
+ *     tight multi-fold — content WRAPS CONCENTRIC with the silhouette in a
+ *     band right at the edge, while the exponent keeps that fold a thin ring so
+ *     it never doubles readable body text further in.
+ * The rim gradient is RIM_EXP × REFRACT; at 2.6 × 0.88 ≈ 2.29 the outermost
+ * ~10% of the radius folds hard into those concentric bands, the rest
+ * magnifies cleanly.
  */
-const GLASS_RIM_EXP = 2.0;
+const GLASS_RIM_EXP = 2.6;
+
+/**
+ * Edge blur — the rim of the glass softly blurs the refracted content so it
+ * "melds" through the edge (Apple liquid-glass), instead of the hard, crisp
+ * meniscus. BLUR_INNER is where the blur starts (fraction of the radius; the
+ * inner disc stays perfectly sharp), ramping to full at the rim. The blur radius
+ * is r × BLUR_FRACTION so it scales with the shrinking sphere and melds equally
+ * at every size.
+ */
+const BLUR_INNER = 0.72;
+const BLUR_FRACTION = 0.06;
 
 /**
  * The three colour channels of the chromatic-aberration pass. Each refracts the
@@ -155,10 +168,10 @@ function buildGlassMap(): string {
         // (and 0 across the whole clear interior). mag = e^RIM_EXP concentrates
         // the bend toward the rim: the inner band magnifies as a clean single
         // image, and the outermost ring — where the gradient (RIM_EXP·REFRACT)
-        // spikes well past the caustic — folds into a bright glass MENISCUS that
-        // wraps + compresses content at the silhouette, a genuinely ~5× stronger
-        // edge. The exponent stays >1 so the onset at the inner bezel edge is
-        // smooth (slope → 0 there), no hard ring where the distortion begins.
+        // is driven FAR past the caustic — folds MULTIPLE times, smearing content
+        // into CONCENTRIC bands that wrap the silhouette right at the edge. The
+        // exponent stays >1 so the onset at the inner bezel edge is smooth
+        // (slope → 0 there), no hard ring where the distortion begins.
         const e = 1 - Math.min(1, (1 - rr) / GLASS_BEZEL);
         const mag = Math.pow(e, GLASS_RIM_EXP);
         const ux = dx / dist;
@@ -171,6 +184,42 @@ function buildGlassMap(): string {
       img.data[i + 1] = Math.max(0, Math.min(255, Math.round(g)));
       img.data[i + 2] = 128;
       img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas.toDataURL();
+}
+
+/**
+ * Build a UNIT-square RIM ALPHA MASK: fully transparent through the clear centre
+ * (rr < BLUR_INNER) and ramping to fully opaque at the rim. Positioned onto the
+ * sphere like the glass map, it's the `in2` of the edge-blur composite — the
+ * blurred copy of the refracted page is kept ONLY where this mask is opaque, so
+ * the softening lives at the edge while the centre stays crisp.
+ */
+function buildBlurMask(): string {
+  const n = GLASS_MAP_SIZE;
+  const canvas = document.createElement("canvas");
+  canvas.width = n;
+  canvas.height = n;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+  const img = ctx.createImageData(n, n);
+  const center = n / 2;
+  const radius = n / 2;
+
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const dx = x - center + 0.5;
+      const dy = y - center + 0.5;
+      const rr = Math.hypot(dx, dy) / radius; // 0 centre → 1 at the inscribed rim
+      // Transparent through the sharp interior, smooth ramp to opaque at the rim.
+      const alpha = rr < 1 ? smoothstep((rr - BLUR_INNER) / (1 - BLUR_INNER)) : 0;
+      const i = (y * n + x) * 4;
+      img.data[i] = 255;
+      img.data[i + 1] = 255;
+      img.data[i + 2] = 255;
+      img.data[i + 3] = Math.round(alpha * 255);
     }
   }
   ctx.putImageData(img, 0, 0);
@@ -197,6 +246,10 @@ export default function PageWarp({ children }: { children: ReactNode }) {
   // The glass map's <feImage>. Its x/y/width/height are rewritten every frame so
   // the refracting bezel stays glued to the shrinking sphere's rim.
   const feImageRef = useRef<SVGFEImageElement>(null);
+  // Edge-blur nodes: the rim alpha mask's <feImage> (tracks the sphere like the
+  // glass map) and the <feGaussianBlur> whose stdDeviation is scaled per-frame.
+  const blurMaskRef = useRef<SVGFEImageElement>(null);
+  const blurRef = useRef<SVGFEGaussianBlurElement>(null);
   // The glass BODY overlay — a translucent gray sheen (stronger at the rim), a
   // top specular highlight, and a rim/contact shadow, seated over the sphere so
   // it reads as a physical lens, not just a distortion. Refraction bends pixels;
@@ -211,6 +264,7 @@ export default function PageWarp({ children }: { children: ReactNode }) {
   const mapBuiltRef = useRef(false);
   const [region, setRegion] = useState<Region | null>(null);
   const [mapUri, setMapUri] = useState("");
+  const [blurMaskUri, setBlurMaskUri] = useState("");
 
   // Measure the bottom-viewport filter region, and build the glass map the FIRST
   // time only. The map's content depends solely on the module constants, not the
@@ -231,6 +285,7 @@ export default function PageWarp({ children }: { children: ReactNode }) {
     if (!mapBuiltRef.current) {
       mapBuiltRef.current = true;
       setMapUri(buildGlassMap());
+      setBlurMaskUri(buildBlurMask());
     }
   };
 
@@ -406,11 +461,13 @@ export default function PageWarp({ children }: { children: ReactNode }) {
         // clip circle so its bezel refracts EXACTLY at the sphere's rim. The
         // sphere shrinks as it forms, so the refracting ring must FOLLOW the edge
         // (a static, region-sized map would strand the fringe in space).
-        if (fi) {
-          fi.setAttribute("x", String(cx - r));
-          fi.setAttribute("y", String(cyDoc - r));
-          fi.setAttribute("width", String(2 * r));
-          fi.setAttribute("height", String(2 * r));
+        // Both the glass map and the rim blur-mask ride the same disc geometry.
+        for (const node of [fi, blurMaskRef.current]) {
+          if (!node) continue;
+          node.setAttribute("x", String(cx - r));
+          node.setAttribute("y", String(cyDoc - r));
+          node.setAttribute("width", String(2 * r));
+          node.setAttribute("height", String(2 * r));
         }
         // Split the three channels around the base strength — blue bends more,
         // red less. Since the bezel only refracts at the rim, the mismatched
@@ -421,6 +478,9 @@ export default function PageWarp({ children }: { children: ReactNode }) {
         dispRefs.current.forEach((node, i) =>
           node?.setAttribute("scale", String(channelScales[i]))
         );
+        // Edge-blur radius scales with the sphere so the meld reads the same at
+        // every size (a fixed px blur would smear the small final sphere).
+        blurRef.current?.setAttribute("stdDeviation", String(r * BLUR_FRACTION));
       }
 
       // Feather a soft band at the page's bottom edge early in the pull so the
@@ -638,7 +698,35 @@ export default function PageWarp({ children }: { children: ReactNode }) {
                 </Fragment>
               ))}
               <feBlend in="cr" in2="cg" mode="screen" result="crg" />
-              <feBlend in="crg" in2="cb" mode="screen" />
+              <feBlend in="crg" in2="cb" mode="screen" result="sharp" />
+              {/* EDGE BLUR — soften the refracted rim so content MELDS through the
+                  glass edge (Apple liquid-glass) instead of a crisp meniscus.
+                  Blur the sharp chromatic result, keep it only where the rim mask
+                  is opaque (its geometry + the blur radius are driven per-frame in
+                  apply()), then lay that back OVER the crisp centre. */}
+              <feImage
+                ref={blurMaskRef}
+                href={blurMaskUri}
+                x={region.x}
+                y={region.y}
+                width={0}
+                height={0}
+                preserveAspectRatio="none"
+                result="blurmask"
+              />
+              <feGaussianBlur
+                ref={blurRef}
+                in="sharp"
+                stdDeviation={0}
+                result="blurred"
+              />
+              <feComposite
+                in="blurred"
+                in2="blurmask"
+                operator="in"
+                result="blurrim"
+              />
+              <feComposite in="blurrim" in2="sharp" operator="over" />
             </filter>
           )}
         </defs>

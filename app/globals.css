@@ -144,6 +144,18 @@ body.scrollchat-locked {
   overflow: hidden;
 }
 
+/* Hide the scrollbar visually while KEEPING the element scrollable — wheel,
+   drag, and programmatic scrollTo all still work. Used by the chat message
+   list, which scrolls itself to pin each question to the top. NOT
+   `overflow:hidden`, which would kill that scroll entirely. */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* WebKit/Blink: Chrome, Safari */
+}
+
 /* ── Scroll-to-AI-chat ─────────────────────────────────────────────────────
    The chat is a stationary backdrop that lives behind the page; the page warps
    into a circle and flies off as the chip. The "Apple Intelligence" colour now
