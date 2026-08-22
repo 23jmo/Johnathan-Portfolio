@@ -1,0 +1,7 @@
+{
+  "generatedBy": "scripts/generate-glass-maps.mjs",
+  "mapSize": 256,
+  "bezel": 0.5,
+  "rimExponent": 2.6,
+  "blurInner": 0.72
+}
