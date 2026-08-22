@@ -79,7 +79,7 @@ export default function ScreenGlow() {
     if (phase === "idle") return null;
     return (
       <div className="pointer-events-none fixed inset-0 z-[9998]">
-        <div className="absolute -inset-2">
+        <div className="scrollchat-screenglow-frame">
           <div className="scrollchat-screenglow-rotator scrollchat-screenglow-rotator--static">
             <div className="scrollchat-screenglow scrollchat-screenglow--static absolute inset-0" />
           </div>
@@ -94,15 +94,17 @@ export default function ScreenGlow() {
       style={{ opacity: revealPrewarmed, visibility: glowVisibility }}
       className="pointer-events-none fixed inset-0 z-[9998]"
     >
-      {/* -inset-2 so the outer blur doesn't clip at the viewport edge. */}
-      <motion.div style={{ scale: pulseScale }} className="absolute -inset-2">
-        {/* One rotator keeps both filtered copies exactly phase-locked. */}
-        <div className="scrollchat-screenglow-rotator">
-          <div className="scrollchat-screenglow absolute inset-0" />
-          <motion.div
-            style={{ opacity: brightOpacity }}
-            className="scrollchat-screenglow scrollchat-screenglow--bright absolute inset-0"
-          />
+      <motion.div style={{ scale: pulseScale }} className="absolute inset-0">
+        {/* The static frame preserves the original viewport-relative mask. */}
+        <div className="scrollchat-screenglow-frame">
+          {/* One rotator keeps both filtered copies exactly phase-locked. */}
+          <div className="scrollchat-screenglow-rotator">
+            <div className="scrollchat-screenglow absolute inset-0" />
+            <motion.div
+              style={{ opacity: brightOpacity }}
+              className="scrollchat-screenglow scrollchat-screenglow--bright absolute inset-0"
+            />
+          </div>
         </div>
       </motion.div>
     </motion.div>

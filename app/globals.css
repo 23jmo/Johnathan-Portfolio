@@ -172,25 +172,34 @@ body.scrollchat-locked {
   );
 }
 
-/* The viewport-framing glow is baked as a 1102px square, then rendered at a
-   minimum 2x size. 142vmax keeps the square at least as large as the viewport
-   diagonal on displays beyond 1080p, so rotation can never uncover a corner.
-   The formerly elliptical viewport mask is baked circularly into the square:
-   its edge weighting stays fixed while the conic colors rotate. Regenerate via
-   `node scripts/generate-scrollchat-glow.mjs` if the palette or mask changes. */
+/* The viewport-relative mask stays on a non-rotating frame: its elliptical
+   geometry keeps the same edge/corner weighting at every aspect ratio, while
+   overflow clips the much larger filtered layers back to the visible screen. */
+.scrollchat-screenglow-frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  -webkit-mask: radial-gradient(125% 125% at 50% 50%, transparent 38%, #000 74%);
+  mask: radial-gradient(125% 125% at 50% 50%, transparent 38%, #000 74%);
+}
+
+/* The conic itself is baked as a tiny opaque square. The exact viewport
+   diagonal prevents empty corners at every aspect ratio; 64px of overscan
+   keeps the live blur away from that square's boundary. Regenerate via
+   `node scripts/generate-scrollchat-glow.mjs` if the palette changes. */
 .scrollchat-screenglow-rotator {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: max(2204px, 142vmax);
+  width: calc(hypot(100vw, 100vh) + 64px);
   aspect-ratio: 1;
-  transform-origin: center;
-  will-change: transform;
+  translate: -50% -50%;
+  rotate: 0deg;
   animation: scrollchat-glow-rotate 7s linear infinite;
 }
 
 .scrollchat-screenglow {
-  background: url("/images/scrollchat/screen-glow.png") center / 100% 100%
+  background: url("/images/scrollchat/screen-glow.webp") center / 100% 100%
     no-repeat;
   filter: blur(26px) saturate(1.8) brightness(1.25);
   /* Opacity breathes independently while the shared parent rotates both copies. */
@@ -207,7 +216,6 @@ body.scrollchat-locked {
 
 /* Reduced-motion: a quiet, still frame at a fixed intensity. */
 .scrollchat-screenglow-rotator--static {
-  transform: translate3d(-50%, -50%, 0);
   animation: none;
 }
 
@@ -217,8 +225,7 @@ body.scrollchat-locked {
 }
 
 @keyframes scrollchat-glow-rotate {
-  from { transform: translate3d(-50%, -50%, 0) rotate(0deg); }
-  to { transform: translate3d(-50%, -50%, 0) rotate(360deg); }
+  to { rotate: 360deg; }
 }
 
 @keyframes scrollchat-aurora-breathe {
