@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { usePathname } from "next/navigation";
 import { useScrollChat } from "./ScrollChatProvider";
 import ChatFooter from "./ChatFooter";
@@ -35,8 +41,14 @@ import glassMapManifest from "@/lib/scrollchat/glassMapManifest.json";
  * Every one of those attributes was exactly LINEAR in the sphere's radius, so
  * the filter is now pinned once to a reference radius r0 and the radius
  * animation is `transform: scale(r / r0)` on the clip layer — the transform that
- * layer was already carrying for the fly. See `WarpGeometry` for what that costs
- * and REFRACTION_STEPS for the one term that could not be folded in this way.
+ * layer was already carrying for the fly. See `WarpGeometry` for what that costs.
+ *
+ * The graph is NOT static and this file does not claim it is. One term — the
+ * refraction envelope — is not linear in the radius and is still written every
+ * frame; see its doc block for why that write turns out to be the cheap one.
+ * What stopped being written is everything that WAS expensive: the page-sized
+ * `clip-path`, the two <feImage> geometries, the blur radius, and the sheen's
+ * layout box.
  *
  * IMPORTANT: `filter`/`transform`/`clip-path` change stacking + re-base
  * `position:fixed` descendants, so at rest we apply NOTHING (styles fully
@@ -63,6 +75,36 @@ import glassMapManifest from "@/lib/scrollchat/glassMapManifest.json";
  * content far, not merely stretch it.
  */
 const GLASS_REFRACT = 0.88;
+
+/**
+ * Chromatic aberration spread: the fractional difference in rim-refraction
+ * strength between the red and blue channels (blue bends MORE, like real
+ * glass). Because the refraction only lives in the bezel, this splits the
+ * channels into prismatic colour ONLY at the sphere's edge — never the centre.
+ */
+const CHROMATIC_SPREAD = 0.16;
+
+/**
+ * The three colour channels of the chromatic-aberration pass. Each refracts the
+ * page through the SAME bezel map at a slightly different strength, is isolated
+ * to its own channel by the `matrix`, then the three are screen-blended back
+ * together — the mismatch is what fringes the sphere's edge with prismatic
+ * colour. Driving the filter from this array (instead of three copy-pasted
+ * <feDisplacementMap>/<feColorMatrix> blocks) keeps the channels in sync.
+ *
+ * These three passes are the most expensive thing in the graph, and an earlier
+ * revision of this change deleted two of them. That was wrong: it did not
+ * "collapse" the fringe, it removed it. They are affordable here because of what
+ * moving the radius animation onto the compositor did to the cost of running the
+ * graph at all — the filtered layer is now rasterized at the sphere's current,
+ * shrinking scale rather than always at 1:1. Restoring all three cost 13ms of
+ * GPU time across a 150-frame pull, measured.
+ */
+const GLASS_CHANNELS = [
+  { key: "r", matrix: "1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" },
+  { key: "g", matrix: "0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" },
+  { key: "b", matrix: "0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" },
+] as const;
 
 /** How far the page rubber-band-lifts at full pull, as a fraction of viewport.
  *  Modest now — the dominant motion is the ball-up, not the lift — and it eases
@@ -132,32 +174,110 @@ const BLUR_FRACTION = 0.06;
 const SHEEN_BASE_RADIUS = 320;
 
 /**
- * QUANTIZATION of the one filter attribute that is still animated.
+ * The sheen's four box-shadows, authored in ON-SCREEN px and divided back out by
+ * the scale the element is currently under.
  *
- * Every geometric term in the graph is exactly linear in the sphere's radius, so
- * the compositor's `scale(r / r0)` reproduces all of them for free. What is left
- * is `collapse × kill` — the envelope that ramps refraction IN with the pull and
- * OUT over the first half of the fly. That is not linear in r, so it still has
- * to be written into `feDisplacementMap/@scale`.
+ * The sheen's geometry is a fixed box that the gesture transform scales, which
+ * is what keeps it off the layout path — but a uniform scale is exactly the
+ * wrong transform for a rim: it shrinks the 1px hairline and the 3px tint ring
+ * along with the sphere, so the finished 66px ball would wear a 0.21px rim
+ * instead of the 1px one it wears at full size. A ring of CONSTANT screen
+ * thickness on a circle of VARYING screen radius is not a uniform scale of
+ * anything, so no static declaration can express it — the two dimensions move
+ * independently, and CSS has no primitive that decouples them. (SVG's
+ * `vector-effect: non-scaling-stroke` looks like the exception and is not: it is
+ * defined against the SVG viewport, so a CSS transform on an HTML ancestor
+ * scales it like any other raster. Measured, not assumed — a 3px ring rendered
+ * 4 device px at scale 1 and 2 device px at scale 0.5.)
  *
- * Writing it continuously would re-run the whole graph every frame, which is the
- * cost this change exists to remove. Instead the envelope is snapped to a ladder
- * of REFRACTION_STEPS values and the attribute is written only when the step
- * actually changes — order 10 writes for a whole gesture instead of one a frame.
+ * So these are written back during the gesture, on the RIM element rather than
+ * the sheen body. That split is not cosmetic: writing them onto the sheen itself
+ * invalidates its three radial gradients and its 40px-blur contact shadow too,
+ * and re-rastering all of that at DPR 2 costs MORE than the page-sized filter
+ * graph this whole change exists to stop touching (measured: 265ms of GPU time
+ * over a 150-frame pull, against 20ms for the filter). On its own element the
+ * shadows repaint alone.
  *
- * The ladder is deliberately NON-uniform: step i stands for (i/N)^CURVE, so the
- * steps bunch up near zero. That is where the eye is most sensitive, because the
- * sphere is still near its maximum radius there and the on-screen displacement
- * is r × BEZEL × REFRACT × envelope — with a uniform ladder the refraction would
- * POP into existence tens of pixels wide on its very first step.
- *
- * HYSTERESIS is in step units: the envelope has to move further than this from
- * the step currently applied before a new value is written, so an envelope
- * dithering across a boundary can't thrash the graph.
+ * They are also QUANTIZED — see SHEEN_RIM_STEP. This is the ONLY quantized
+ * write left in the file; the refraction envelope used to be quantized too and
+ * deliberately is not any more, for reasons that are the mirror image of the
+ * ones that justify it here.
  */
-const REFRACTION_STEPS = 16;
-const REFRACTION_CURVE = 1.6;
-const REFRACTION_HYSTERESIS = 0.65;
+const rimShadow = (scale: number) => {
+  const px = (onScreen: number) => onScreen / scale;
+  return (
+    `inset 0 0 0 ${px(1)}px rgba(255,255,255,0.55),` +
+    `inset 0 0 0 ${px(3)}px rgba(148,152,166,0.34),` +
+    `inset 0 ${px(-8)}px ${px(16)}px ${px(-6)}px rgba(68,72,88,0.5),` +
+    `0 ${px(16)}px ${px(40)}px ${px(-12)}px rgba(0,0,0,0.4)`
+  );
+};
+
+/**
+ * The rim's counter-scale ladder — a GEOMETRIC one, because what has to stay
+ * imperceptible here is the RELATIVE error in a thickness, not an absolute
+ * displacement.
+ *
+ * A step of 1.12 means the thickness written is never more than ~6% off the
+ * thickness wanted: the 1px hairline renders between 0.94px and 1.06px, i.e.
+ * within an eighth of a device pixel at DPR 2, and the 3px ring proportionally.
+ * That is constant to below the resolution it is drawn at, for ~26 repaints of
+ * a bare ring element across a full pull instead of 150 repaints of the whole
+ * glass body.
+ *
+ * Quantizing THIS is worth it in a way that quantizing the filter attribute was
+ * not, and the measurement is lopsided enough to be worth recording: writing the
+ * rim every frame costs 298ms of GPU and 1341 raster tasks over a 150-frame
+ * pull, against 59ms and 339 for the ladder. A box-shadow write dirties a
+ * full-DPR blurred paint no matter how small the sphere has become, so it gets
+ * none of the shrinking-raster discount the filter gets.
+ *
+ * FREE_WRITES / HYSTERESIS_GROWTH / MAX exist because the visitor drives
+ * `progress` directly and can walk a ladder up and down as often as they like:
+ * past the free writes the deadband widens, so a visitor sawing the scroll back
+ * and forth gets a coarser rim rather than an unbounded number of repaints, and
+ * MAX is a hard stop that holds by inspection.
+ */
+const SHEEN_RIM_STEP = 1.12;
+const SHEEN_RIM_HYSTERESIS = 0.6;
+const SHEEN_RIM_FREE_WRITES = 48;
+const SHEEN_RIM_HYSTERESIS_GROWTH = 0.5;
+const MAX_SHEEN_RIM_WRITES = 96;
+
+/** The counter-scale that rim ladder rung `rung` stands for. */
+const rimScaleForRung = (rung: number) => Math.pow(SHEEN_RIM_STEP, rung);
+
+/**
+ * Below this the sheen is transparent enough that nothing it paints can be seen,
+ * so the rim ladder stops writing — the same "don't invalidate what isn't
+ * visible" gate the refraction gets from `filterActive`.
+ */
+const SHEEN_VISIBLE_ALPHA = 0.02;
+
+/**
+ * The refraction ENVELOPE — `collapse × kill` — is the one term in the lens that
+ * is NOT linear in the sphere's radius, so the compositor's `scale(r / r0)`
+ * cannot reproduce it and it still has to be written into the graph, once per
+ * frame, exactly as before.
+ *
+ * An earlier revision quantized it to a ladder to avoid those writes. Measured,
+ * that was the wrong trade twice over: it bought ~13ms of GPU time across a
+ * 150-frame pull (against a ~352ms baseline — under 4%), and it cost a 14px jump
+ * in on-screen rim displacement at every rung change, a 25-37% discontinuity in
+ * an effect whose whole job is to look like smoothly bending glass.
+ *
+ * It is cheap because of what the rest of this change did, not in spite of it.
+ * The radius animation now lives on the transform, so Blink rasters the filtered
+ * layer at the sphere's CURRENT composited scale — a surface that shrinks with
+ * the sphere — and is re-rastering it every frame regardless. Re-running the
+ * graph on top of that is incremental. What was expensive in the old code was
+ * never this attribute: it was the per-frame `clip-path` on a page-sized layer,
+ * the <feImage> geometry rewrites, and the blur radius, all of which are now
+ * static (1714 raster tasks over a pull, down to 339).
+ *
+ * Contrast SHEEN_RIM_STEP, where quantization IS worth it — a box-shadow write
+ * gets none of this discount.
+ */
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 const smoothstep = (t: number) => {
@@ -165,9 +285,6 @@ const smoothstep = (t: number) => {
   return x * x * (3 - 2 * x);
 };
 
-/** The refraction envelope that ladder step `step` stands for. */
-const refractionForStep = (step: number) =>
-  Math.pow(step / REFRACTION_STEPS, REFRACTION_CURVE);
 
 /**
  * Everything about the warp that is fixed for a given page + viewport, measured
@@ -183,11 +300,18 @@ const refractionForStep = (step: number) =>
  *   - CSS `filter` runs BEFORE `transform`: the filter is evaluated in the
  *     content's own coordinate space and only then scaled. The area of that
  *     space which ends up visible GROWS as the scale shrinks — out to the full
- *     r0 disc — so the filter REGION has to be that disc's bounding box, not the
- *     viewport. Anything smaller and the sphere's top and bottom get sliced off
- *     as it shrinks. That is a real cost (≈3.5× the pixels of the old
- *     viewport-sized region) but it is paid ONCE, up front, by the pre-warm
- *     decoy — where the old region was re-rasterized on every frame of the pull.
+ *     r0 disc — so the filter REGION has to be that disc, not the viewport.
+ *     Anything smaller and the sphere's top and bottom get sliced off as it
+ *     shrinks.
+ *
+ *     That is a real and PERMANENT cost, not one the pre-warm decoy absorbs:
+ *     every evaluation now covers more pixels than the old viewport-sized region
+ *     did (see `filterX` for how much of the excess is clipped back off). The
+ *     decoy only pays for building the graph, decoding the maps and allocating
+ *     the surface — it cannot pre-render the real page's filtered output, which
+ *     is still produced at least once per gesture and again on every rung. The
+ *     trade is a bigger region evaluated a couple of dozen times against a
+ *     smaller one evaluated on every frame of the pull.
  */
 interface WarpGeometry {
   /** Porthole centre, in the warped content's own (document) coordinate space. */
@@ -195,10 +319,27 @@ interface WarpGeometry {
   centerY: number;
   /** r0 — the reference radius every filter attribute is pinned to. */
   referenceRadius: number;
-  /** <filter> region: the bounding box of the r0 disc. */
+  /**
+   * <filter> region: the r0 disc's bounding box, CLIPPED to where the filtered
+   * element can actually put ink.
+   *
+   * The region has to be the r0 disc rather than the viewport, because a CSS
+   * `filter` is evaluated BEFORE the `transform` that scales it: at scale s the
+   * area that ends up on screen is, in the filtered element's own space, the
+   * viewport divided by s — which grows without bound as the sphere collapses
+   * and is soon the whole disc.
+   *
+   * But it does NOT have to be the whole 2r0 square. SourceGraphic is the page
+   * content only; the opaque disc filling out the corners of the porthole is a
+   * box-shadow on the CLIP layer, which the filter never sees. Everything
+   * outside the page box is therefore transparent no matter how large the region
+   * is, so intersecting the square with the page (plus a blur margin) buys the
+   * same output for materially fewer pixels on every evaluation.
+   */
   filterX: number;
   filterY: number;
-  filterSize: number;
+  filterWidth: number;
+  filterHeight: number;
 }
 
 export default function PageWarp({ children }: { children: ReactNode }) {
@@ -207,15 +348,20 @@ export default function PageWarp({ children }: { children: ReactNode }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const clipRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  // The single displacement node. Its `scale` is the ONE filter attribute still
-  // written during the gesture, and only when the quantized refraction envelope
-  // changes step (see REFRACTION_STEPS).
-  const dispRef = useRef<SVGFEDisplacementMapElement>(null);
+  // One displacement node per colour channel (see GLASS_CHANNELS). Their three
+  // `scale` values are the ONLY filter attributes still written during the
+  // gesture, and they are always written together in one frame, so the fringe
+  // costs a single graph invalidation rather than three.
+  const dispRefs = useRef<(SVGFEDisplacementMapElement | null)[]>([]);
   // The glass BODY overlay — a translucent gray sheen (stronger at the rim), a
   // top specular highlight, and a rim/contact shadow, seated over the sphere so
   // it reads as a physical lens, not just a distortion. Refraction bends pixels;
   // this adds the material. Parked on the sphere once, then only transformed.
   const sheenRef = useRef<HTMLDivElement>(null);
+  // The sheen's RIM — the two hairline rings and the two soft shadows, on their
+  // own element so counter-scaling them (see rimShadow) repaints a bare ring
+  // instead of the whole gradient-and-blur glass body.
+  const rimRef = useRef<HTMLDivElement>(null);
   // The pre-warm decoy that carries the glass filter while the gesture is only
   // ARMED, so Blink allocates the filtered surface before the pull (see the
   // pre-warm effect below).
@@ -225,6 +371,12 @@ export default function PageWarp({ children }: { children: ReactNode }) {
   // Mirror of `geometry` readable inside the imperative warp loop without it
   // becoming a hook dependency (the loop runs on every progress frame).
   const geometryRef = useRef<WarpGeometry | null>(null);
+  // Bumped by every recompute(). engage() stamps the version it measured, and
+  // apply() re-engages when they disagree — otherwise a resize MID-GESTURE would
+  // move the SVG region (React re-renders <filter> from the new geometry) while
+  // the imperative loop kept driving the old centre, radius and clip circle
+  // until the next gesture.
+  const geometryVersionRef = useRef(0);
   const [geometry, setGeometry] = useState<WarpGeometry | null>(null);
 
   // Measure the page and derive the warp geometry: the porthole's centre, the
@@ -243,17 +395,26 @@ export default function PageWarp({ children }: { children: ReactNode }) {
     const centerY = Math.max(0, pageHeight - portholeHeight) + portholeHeight / 2;
     const referenceRadius =
       (Math.hypot(pageWidth, viewportHeight) / 2) * PORTHOLE_MAX_RADIUS_FACTOR;
+    // The r0 disc's bounding box, clipped to the page — see the WarpGeometry doc
+    // for why the region is the disc and not the viewport, and why clipping it
+    // to the page costs nothing. The margin is the edge blur's 3σ, so the rim
+    // blur still has every source pixel it can reach.
+    const blurMargin = referenceRadius * BLUR_FRACTION * 3;
+    const filterX = Math.max(centerX - referenceRadius, -blurMargin);
+    const filterY = Math.max(centerY - referenceRadius, -blurMargin);
+    const filterRight = Math.min(centerX + referenceRadius, pageWidth + blurMargin);
+    const filterBottom = Math.min(centerY + referenceRadius, pageHeight + blurMargin);
     const next: WarpGeometry = {
       centerX,
       centerY,
       referenceRadius,
-      // The r0 disc's bounding box — see the WarpGeometry doc for why the region
-      // is this and not the viewport.
-      filterX: centerX - referenceRadius,
-      filterY: centerY - referenceRadius,
-      filterSize: 2 * referenceRadius,
+      filterX,
+      filterY,
+      filterWidth: filterRight - filterX,
+      filterHeight: filterBottom - filterY,
     };
     geometryRef.current = next;
+    geometryVersionRef.current += 1;
     setGeometry(next);
   };
 
@@ -310,10 +471,13 @@ export default function PageWarp({ children }: { children: ReactNode }) {
     // Final fly scale — depends only on the (cached) chip slot size, so it's
     // computed once in engage() rather than every frame.
     let sFinal = 1;
-    // Which rung of the refraction ladder is currently written into the filter.
-    // −1 means "nothing written yet this gesture", which forces the first frame
-    // to write whatever step it lands on.
-    let appliedRefractionStep = -1;
+    // Which rung of the rim's counter-scale ladder is currently painted, and how
+    // many times this gesture has repainted it (bounded by MAX_SHEEN_RIM_WRITES).
+    let appliedRimRung: number | null = null;
+    let rimWrites = 0;
+    // The geometry version engage() measured, so a mid-gesture resize can be
+    // detected and re-engaged rather than silently desynchronising.
+    let engagedGeometryVersion = -1;
 
     const engage = () => {
       vh = window.innerHeight;
@@ -330,7 +494,9 @@ export default function PageWarp({ children }: { children: ReactNode }) {
       // it keeps the sheen glued to the sphere if the two ever disagree.
       centerViewportY = cyDoc - window.scrollY;
       hasDef = !!document.getElementById("scrollchat-fisheye");
-      appliedRefractionStep = -1;
+      appliedRimRung = null;
+      rimWrites = 0;
+      engagedGeometryVersion = geometryVersionRef.current;
 
       // Land the flying circle exactly on the in-input chip slot. Measured ONCE
       // here (the slot is stationary during the gesture); fall back to a fixed
@@ -371,6 +537,38 @@ export default function PageWarp({ children }: { children: ReactNode }) {
         // reaches radius r on screen without a per-frame clip-path rewrite —
         // which, like a filter attribute, is a paint-path write.
         k.style.clipPath = `circle(${referenceRadius}px at ${cx}px ${cyDoc}px)`;
+
+        // THE PORTHOLE IS A DISC OF RADIUS r0 IN THIS LAYER'S OWN SPACE, and r0
+        // is deliberately larger than the page's half-width AND half-height — so
+        // the clip circle reaches well outside the layer's box on every side.
+        //
+        // That never mattered while the circle shrank for real: by the time it
+        // was small enough to see, it was comfortably inside the page. Now the
+        // circle is frozen at r0 and the compositor scales it, so whatever the
+        // silhouette looks like at r0 is what it looks like at EVERY size — and
+        // at r0 the parts of the circle beyond the page box have nothing painted
+        // in them. Left unfixed, the "sphere" is permanently flat-sided and cut
+        // off above its own bottom, at fixed proportions, forever.
+        //
+        // A box-shadow with a large spread paints the page's background out to
+        // r0 in every direction, and clip-path then cuts it back to the circle.
+        // Deliberately a shadow and not a child element: shadows are INK
+        // overflow, so this adds nothing to the document's scrollable overflow —
+        // a real element at inset:-r0 would widen the page and, worse, feed its
+        // own height back into the next recompute()'s scrollHeight.
+        k.style.boxShadow = `0 0 0 ${referenceRadius}px var(--background)`;
+
+        // ...but any mask clips the element to `mask-clip`, which defaults to
+        // border-box and would amputate exactly the ink we just added, bringing
+        // the flat sides straight back the moment the feather engages. Opt out,
+        // and stretch the mask's painting area over the disc so the gradient has
+        // somewhere to land out there. Static; only the image itself is written
+        // per frame (see the feather in apply()).
+        k.style.maskClip = "no-clip";
+        k.style.maskRepeat = "no-repeat";
+        const maskSpan = `calc(100% + ${2 * referenceRadius}px)`;
+        k.style.maskSize = `${maskSpan} ${maskSpan}`;
+        k.style.maskPosition = `${-referenceRadius}px ${-referenceRadius}px`;
       }
 
       // The sheen's BOX is fixed (SHEEN_BASE_RADIUS) and parked on the porthole
@@ -389,6 +587,8 @@ export default function PageWarp({ children }: { children: ReactNode }) {
     const clearStyles = () => {
       const c = contentRef.current;
       const k = clipRef.current;
+      const rim = rimRef.current;
+      if (rim) rim.style.boxShadow = "";
       const sheen = sheenRef.current;
       if (sheen) {
         // display:none removes the shadow/gradient blob from paint entirely at
@@ -409,6 +609,11 @@ export default function PageWarp({ children }: { children: ReactNode }) {
       }
       if (k) {
         k.style.clipPath = "";
+        k.style.boxShadow = "";
+        k.style.removeProperty("mask-clip");
+        k.style.removeProperty("mask-repeat");
+        k.style.removeProperty("mask-size");
+        k.style.removeProperty("mask-position");
         k.style.opacity = "";
         k.style.position = "";
         k.style.zIndex = "";
@@ -420,7 +625,9 @@ export default function PageWarp({ children }: { children: ReactNode }) {
         k.style.removeProperty("mask-image");
         k.style.removeProperty("-webkit-mask-image");
       }
-      appliedRefractionStep = -1;
+      appliedRimRung = null;
+      rimWrites = 0;
+      engagedGeometryVersion = -1;
       applied = false;
     };
 
@@ -428,7 +635,9 @@ export default function PageWarp({ children }: { children: ReactNode }) {
       const c = contentRef.current;
       const k = clipRef.current;
       if (!c || !k) return;
-      if (!applied) engage();
+      if (!applied || engagedGeometryVersion !== geometryVersionRef.current) {
+        engage();
+      }
 
       // PULL now does the WARP: the page curls into a sphere as you pull past
       // the bottom, COMPLETE at p=1. `collapse` is driven by `progress` (was
@@ -477,27 +686,29 @@ export default function PageWarp({ children }: { children: ReactNode }) {
       c.style.filter = filterActive ? "url(#scrollchat-fisheye)" : "";
       c.style.willChange = filterActive ? "filter" : "";
 
-      // Snap the envelope to the ladder and touch the graph ONLY when the rung
-      // changes. Everything else the filter needs — the map square, the blur
-      // radius, the region — is static and lives in the JSX.
-      const exactStep =
-        REFRACTION_STEPS *
-        Math.pow(clamp01(refractionEnvelope), 1 / REFRACTION_CURVE);
-      if (
-        appliedRefractionStep < 0 ||
-        Math.abs(exactStep - appliedRefractionStep) > REFRACTION_HYSTERESIS
-      ) {
-        appliedRefractionStep = Math.round(exactStep);
+      // The envelope, written straight through — see its doc block for why this
+      // is the one graph write worth keeping per-frame. Everything else the
+      // filter needs (the map square, the blur radius, the region) is static and
+      // lives in the JSX; r0 rather than r, because the compositor's scale
+      // brings it back to r.
+      //
+      // Gated on `filterActive`: while the filter string is detached there is no
+      // graph to invalidate, so the write buys nothing and is skipped.
+      if (filterActive) {
         // NEGATIVE = the MAGNIFY direction (edge content enlarged, wrapping the
-        // curve), not the fisheye compression.
-        dispRef.current?.setAttribute(
-          "scale",
-          String(
-            -referenceRadius *
-              GLASS_BEZEL *
-              GLASS_REFRACT *
-              refractionForStep(appliedRefractionStep)
-          )
+        // curve), not the fisheye compression. Split the three channels around
+        // it — blue bends more, red less — so the mismatch fringes the rim, and
+        // only the rim, with prismatic colour.
+        const glassScale =
+          -referenceRadius * GLASS_BEZEL * GLASS_REFRACT * refractionEnvelope;
+        const spread = glassScale * CHROMATIC_SPREAD;
+        const channelScales = [
+          glassScale - spread,
+          glassScale,
+          glassScale + spread,
+        ];
+        dispRefs.current.forEach((node, i) =>
+          node?.setAttribute("scale", String(channelScales[i]))
         );
       }
 
@@ -509,8 +720,15 @@ export default function PageWarp({ children }: { children: ReactNode }) {
         // The mask lives on the clip layer, which the warp now scales — so
         // divide that scale back out to keep the feather the same thickness ON
         // SCREEN as it was when the clip layer sat at 1:1.
+        //
+        // engage() also stretched the mask's painting area r0 beyond the box on
+        // every side (so it can cover the backdrop shadow rather than clipping
+        // it off), which puts the mask's own bottom edge r0 BELOW the page's.
+        // Add that back so the feather still lands on the page's bottom edge.
         const featherLocal = feather / warpScale;
-        const m = `linear-gradient(to bottom, #000 calc(100% - ${featherLocal}px), transparent 100%)`;
+        const m = `linear-gradient(to bottom, #000 calc(100% - ${
+          referenceRadius + featherLocal
+        }px), transparent 100%)`;
         k.style.setProperty("mask-image", m);
         k.style.setProperty("-webkit-mask-image", m);
       } else {
@@ -578,7 +796,34 @@ export default function PageWarp({ children }: { children: ReactNode }) {
         // glass body reads as clearly gray by mid-pull — but still keyed off
         // `collapse`, so a huge barely-formed circle at the very start isn't
         // ringed in gray across the viewport.
-        sheen.style.opacity = String(sphereAlpha * Math.min(1, collapse * 1.4));
+        const sheenAlpha = sphereAlpha * Math.min(1, collapse * 1.4);
+        sheen.style.opacity = String(sheenAlpha);
+
+        // Counter-scale the rim rings and the two soft shadows so they keep the
+        // thickness they were designed at at every sphere size — snapped to the
+        // geometric ladder, and skipped entirely while the sheen is too faint to
+        // show what it would paint. `S * sheenScale`, because the fly scale is
+        // part of what the element is under; `S` and not `Sx`/`Sy` because
+        // box-shadow has no anisotropic form and the liquid wobble is a ±7%
+        // squash, far under a pixel of rim.
+        const rim = rimRef.current;
+        if (rim && sheenAlpha > SHEEN_VISIBLE_ALPHA) {
+          const exactRung =
+            Math.log(S * sheenScale) / Math.log(SHEEN_RIM_STEP);
+          const rimDeadband =
+            SHEEN_RIM_HYSTERESIS +
+            Math.max(0, rimWrites - SHEEN_RIM_FREE_WRITES) *
+              SHEEN_RIM_HYSTERESIS_GROWTH;
+          if (
+            rimWrites < MAX_SHEEN_RIM_WRITES &&
+            (appliedRimRung === null ||
+              Math.abs(exactRung - appliedRimRung) > rimDeadband)
+          ) {
+            appliedRimRung = Math.round(exactRung);
+            rimWrites += 1;
+            rim.style.boxShadow = rimShadow(rimScaleForRung(appliedRimRung));
+          }
+        }
       }
 
       applied = true;
@@ -646,6 +891,14 @@ export default function PageWarp({ children }: { children: ReactNode }) {
   // surface Blink allocates — is the same whether the filter hangs off the
   // page-sized content layer or off a 1px decoy.
   //
+  // What this does NOT do is pre-compute the page's filtered pixels. The decoy's
+  // SourceGraphic is one near-transparent pixel, not the page, so nothing about
+  // its output transfers; the real content is still pushed through the graph on
+  // the first frame that attaches the filter and again on every rung change.
+  // The win is confined to the one-time setup — graph construction, <feImage>
+  // fetch + decode, surface allocation — which is the part that would otherwise
+  // land synchronously on the pull's very first frame.
+  //
   // It is handed BACK the instant the pull starts: the decoy shares the one
   // <filter> element, so leaving it attached would keep a second region-sized
   // surface alive alongside the page's for the whole gesture.
@@ -691,11 +944,12 @@ export default function PageWarp({ children }: { children: ReactNode }) {
 
   return (
     <>
-      {/* Off-screen filter def. EVERY attribute here is static: the region, the
-          map square and the blur radius are all pinned to r0, and the gesture
-          scales the result on the compositor instead of redrawing them. The only
-          exception is <feDisplacementMap scale>, which apply() writes when the
-          quantized refraction envelope changes rung. */}
+      {/* Off-screen filter def. Every attribute here is static EXCEPT the three
+          <feDisplacementMap scale>s: the region, the map square and the blur
+          radius are all pinned to r0, and the gesture scales the result on the
+          compositor instead of redrawing them. The three scales carry the one
+          term that isn't linear in the radius — the refraction envelope — which
+          apply() writes per frame, together. */}
       <svg
         aria-hidden
         width="0"
@@ -710,8 +964,8 @@ export default function PageWarp({ children }: { children: ReactNode }) {
               filterUnits="userSpaceOnUse"
               x={geometry.filterX}
               y={geometry.filterY}
-              width={geometry.filterSize}
-              height={geometry.filterSize}
+              width={geometry.filterWidth}
+              height={geometry.filterHeight}
               colorInterpolationFilters="sRGB"
             >
               {/* Neutral (no-displacement) field over the WHOLE region — R=G=128
@@ -743,26 +997,43 @@ export default function PageWarp({ children }: { children: ReactNode }) {
                 operator="over"
                 result="map"
               />
-              {/* LIQUID GLASS — refract the page through the bezel. This was
-                  three PARALLEL passes, one per colour channel at slightly
-                  different strengths, screen-blended back together to fringe the
-                  rim with prismatic colour. Six of the graph's primitives existed
-                  for that fringe alone, on a graph that re-runs over the entire
-                  region whenever it is touched — the most expensive detail in the
-                  effect relative to how much of the sphere it reached (the rim,
-                  and only the rim). One channel, no fringe, ~half the passes. */}
-              <feDisplacementMap
-                ref={dispRef}
-                in="SourceGraphic"
-                in2="map"
-                scale={0}
-                xChannelSelector="R"
-                yChannelSelector="G"
-                result="sharp"
-              />
+              {/* LIQUID GLASS — refract each colour channel through the same
+                  bezel at a slightly different strength (blue most, red least),
+                  isolate it to its channel, then screen the three back together.
+                  The mismatched refraction is what fringes the sphere's EDGE with
+                  prismatic colour. Rendered from GLASS_CHANNELS so the three
+                  passes can't drift out of sync.
+
+                  These three `scale` values are the only attributes in this
+                  whole graph that apply() ever writes, and they go out together
+                  — so the fringe costs three PASSES per evaluation, but not one
+                  extra evaluation. */}
+              {GLASS_CHANNELS.map((channel, index) => (
+                <Fragment key={channel.key}>
+                  <feDisplacementMap
+                    ref={(node) => {
+                      dispRefs.current[index] = node;
+                    }}
+                    in="SourceGraphic"
+                    in2="map"
+                    scale={0}
+                    xChannelSelector="R"
+                    yChannelSelector="G"
+                    result={`d${channel.key}`}
+                  />
+                  <feColorMatrix
+                    in={`d${channel.key}`}
+                    type="matrix"
+                    values={channel.matrix}
+                    result={`c${channel.key}`}
+                  />
+                </Fragment>
+              ))}
+              <feBlend in="cr" in2="cg" mode="screen" result="crg" />
+              <feBlend in="crg" in2="cb" mode="screen" result="sharp" />
               {/* EDGE BLUR — soften the refracted rim so content MELDS through the
                   glass edge (Apple liquid-glass) instead of a crisp meniscus.
-                  Blur the refracted result, keep it only where the rim mask is
+                  Blur the sharp chromatic result, keep it only where the rim mask is
                   opaque, then lay that back OVER the crisp centre. The mask
                   geometry and the blur radius are pinned to r0 like the glass
                   map, so the compositor scales both back onto the sphere. */}
@@ -808,10 +1079,10 @@ export default function PageWarp({ children }: { children: ReactNode }) {
             Fixed to the viewport (the wrapper has no transformed ancestor, same
             as ChatFooter). Its BOX is a constant 2×SHEEN_BASE_RADIUS parked on
             the sphere centre by engage(); only transform + opacity move per
-            frame. The three stacked gradients are: (1) a soft top specular
-            highlight, (2) a halo behind it, and (3) the gray sheen that is
-            transparent through the centre, strengthens toward the rim, and now
-            carries the two hairline rim rings as well. */}
+            frame plus the counter-scaled shadows. The three stacked gradients
+            are: (1) a soft top specular highlight, (2) a halo behind it, and
+            (3) the gray sheen that is transparent through the centre and
+            strengthens toward the rim. */}
         <div
           ref={sheenRef}
           data-warp-sheen
@@ -831,28 +1102,38 @@ export default function PageWarp({ children }: { children: ReactNode }) {
             // centre. Layer 3: the gray glass BODY — a clearly-present tint
             // through the whole disc that ramps into a heavy gray rim.
             //
-            // Layer 3 also ends in the two rim rings that used to be inset
-            // box-shadows (`inset 0 0 0 3px` and `inset 0 0 0 1px`). Those were
-            // absolute px, so with the element itself transform-scaled they would
-            // have stayed a fixed 3px/1px on screen while everything around them
-            // shrank — a rim growing relatively thicker and thicker as the sphere
-            // collapses. As percentage stops (3px and 1px OF SHEEN_BASE_RADIUS =
-            // 0.94% and 0.31%) they scale with the glass, which is what a real
-            // edge does. The colours are the flattened composite of the old
-            // white-over-gray-over-gradient stack.
+            //
+            // The rim rings are NOT here: an earlier revision moved them into
+            // percentage stops so they would need no per-frame write, but a
+            // percentage stop scales with the element, which is exactly what a
+            // 1px hairline must not do — it rendered 0.21px on the finished
+            // sphere. They live on the rim child below, counter-scaled, which is
+            // the only construction that holds their designed thickness at every
+            // size. This element therefore carries NO box-shadow at all, so its
+            // gradients are painted once and only ever re-composited.
             background:
               "radial-gradient(18% 23% at 29% 20%, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.5) 44%, rgba(255,255,255,0) 72%)," +
               "radial-gradient(33% 41% at 33% 25%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0) 74%)," +
-              "radial-gradient(circle at 50% 50%, rgba(148,152,164,0.38) 0%, rgba(142,146,158,0.4) 42%, rgba(122,126,140,0.52) 66%, rgba(98,102,118,0.68) 85%, rgba(72,76,92,0.82) 95%, rgba(202,208,221,0.53) 99.05%, rgba(178,183,196,0.68) 99.07%, rgba(178,183,196,0.68) 99.67%, rgba(228,229,234,0.86) 99.7%, rgba(228,229,234,0.86) 100%)",
-            // What's left here are the two SOFT shadows: a bottom inner shade to
-            // ground the sphere and an outside contact shadow. They're still
-            // absolute px, but unlike the rim rings that is now an improvement —
-            // the transform scales them, so a small sphere finally casts a small
-            // shadow instead of the same 40px blur it cast at full size.
-            boxShadow:
-              "inset 0 -8px 16px -6px rgba(68,72,88,0.5), 0 16px 40px -12px rgba(0,0,0,0.4)",
+              "radial-gradient(circle at 50% 50%, rgba(148,152,164,0.38) 0%, rgba(142,146,158,0.4) 42%, rgba(122,126,140,0.52) 66%, rgba(98,102,118,0.68) 85%, rgba(72,76,92,0.82) 95%, rgba(208,214,226,0.52) 100%)",
           }}
-        />
+        >
+          {/* RIM — every box-shadow the glass has, on an element of its own.
+              apply() rewrites this one string as the sphere shrinks so all four
+              render at the px they were designed at (rimShadow), which no static
+              declaration can do. Separated from the body above because that body
+              is three radial gradients and would otherwise be re-rastered along
+              with them; here the repaint is a bare ring. */}
+          <div
+            ref={rimRef}
+            data-warp-sheen-rim
+            style={{
+              position: "absolute",
+              inset: 0,
+              borderRadius: "9999px",
+              pointerEvents: "none",
+            }}
+          />
+        </div>
       </div>
 
       {/* PRE-WARM decoy — see the pre-warm effect above. Deliberately NOT the

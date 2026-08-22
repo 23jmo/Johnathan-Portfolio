@@ -20,6 +20,12 @@
  *
  * Deliberately dependency-free (a hand-rolled PNG encoder over `node:zlib`) so
  * the repo doesn't take on `canvas`/`sharp` just to emit two 256px images.
+ *
+ * DETERMINISM: the pixels are fully deterministic — re-running this on any
+ * machine produces byte-identical RGBA. The FILE bytes additionally depend on
+ * whatever `node:zlib` links against, so a future Node/zlib whose deflate output
+ * differs would produce a diff here even though nothing about the images
+ * changed. If that ever happens, compare decoded pixels, not file hashes.
  */
 
 import { deflateSync } from "node:zlib";
