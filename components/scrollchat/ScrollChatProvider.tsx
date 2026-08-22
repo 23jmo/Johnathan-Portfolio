@@ -16,7 +16,12 @@ import {
   useReducedMotion,
   type MotionValue,
 } from "framer-motion";
-import type { ChatMessage, Citation, PageContext } from "@/types";
+import type {
+  ChatMessage,
+  Citation,
+  PageContext,
+  ThinkingStage,
+} from "@/types";
 import {
   CLOSE_FLY_SPRING,
   CLOSE_OVERLAP_TRIGGER,
@@ -90,6 +95,17 @@ export function useScrollChat(): ScrollChatContextValue {
 
 let messageSeq = 0;
 const nextId = () => `m${++messageSeq}-${Math.round(performance.now())}`;
+
+/**
+ * Maps a tool name off the stream to the copy the thinking indicator shows.
+ * Anything unrecognised falls back to the generic stage rather than inventing
+ * a claim about what the model is doing.
+ */
+const TOOL_THINKING_STAGE: Record<string, ThinkingStage> = {
+  cite: "sources",
+  render_youtube: "videos",
+  render_a2ui: "surface",
+};
 
 export default function ScrollChatProvider({
   children,
@@ -393,6 +409,21 @@ export default function ScrollChatProvider({
                     youtube: (event.videos as ChatMessage["youtube"]) ?? [],
                   }));
                   break;
+                case "tool_start": {
+                  // Fired as soon as the model names a tool, well before its
+                  // arguments finish streaming — this is what lets the UI show
+                  // honest progress copy and hold space for a pending card.
+                  const toolName = String(event.name ?? "");
+                  const stage = TOOL_THINKING_STAGE[toolName] ?? "thinking";
+                  patchAssistant((m) => ({
+                    ...m,
+                    thinkingStage: stage,
+                    pendingSurfaceCount:
+                      (m.pendingSurfaceCount ?? 0) +
+                      (toolName === "render_a2ui" ? 1 : 0),
+                  }));
+                  break;
+                }
                 case "a2ui":
                   patchAssistant((m) => ({
                     ...m,
@@ -400,6 +431,11 @@ export default function ScrollChatProvider({
                       ...(m.a2uiSurfaces ?? []),
                       String(event.surface ?? ""),
                     ],
+                    // The real surface has landed, so retire one skeleton.
+                    pendingSurfaceCount: Math.max(
+                      0,
+                      (m.pendingSurfaceCount ?? 0) - 1
+                    ),
                   }));
                   break;
                 case "error": {
@@ -428,7 +464,15 @@ export default function ScrollChatProvider({
           void err;
         } finally {
           flush();
-          patchAssistant((m) => ({ ...m, pending: false }));
+          // Clear transient indicator state however the turn ended. A model can
+          // announce render_a2ui and then fail before delivering it, which would
+          // otherwise leave a skeleton shimmering forever.
+          patchAssistant((m) => ({
+            ...m,
+            pending: false,
+            thinkingStage: undefined,
+            pendingSurfaceCount: 0,
+          }));
           setIsStreaming(false);
         }
       })();

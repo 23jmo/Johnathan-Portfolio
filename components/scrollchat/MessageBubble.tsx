@@ -4,6 +4,7 @@ import type { Components } from "react-markdown";
 import type { ChatMessage } from "@/types";
 import CitationChip from "./CitationChip";
 import A2UISurface from "@/components/a2ui/A2UISurface";
+import A2UISkeleton from "@/components/a2ui/A2UISkeleton";
 
 /** Compact markdown styling for chat bubbles — links open in a new tab. */
 const chatMarkdown: Components = {
@@ -60,6 +61,13 @@ export default function MessageBubble({ message }: { message: ChatMessage }) {
         {message.a2uiSurfaces && message.a2uiSurfaces.length > 0 && (
           <A2UISurface surfaces={message.a2uiSurfaces} />
         )}
+
+        {/* One skeleton per surface the model has announced but not yet sent.
+            Tool arguments are buffered upstream until the model stops talking,
+            so this placeholder can be on screen for several seconds. */}
+        {Array.from({ length: message.pendingSurfaceCount ?? 0 }, (_, index) => (
+          <A2UISkeleton key={`surface-skeleton-${index}`} />
+        ))}
 
         {/* Inline YouTube videos */}
         {message.youtube && message.youtube.length > 0 && (

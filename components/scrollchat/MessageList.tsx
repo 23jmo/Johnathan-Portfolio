@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 import type { ChatMessage } from "@/types";
 import MessageBubble from "./MessageBubble";
+import ThinkingIndicator from "./ThinkingIndicator";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -71,15 +72,27 @@ export default function MessageList({ messages, isStreaming }: MessageListProps)
       aria-atomic="false"
     >
       <div className="space-y-5 py-6">
-        {messages.map((message) =>
-          // No spinner: the empty pending assistant bubble simply renders
-          // nothing until its first token streams in.
-          message.role === "assistant" && message.content.length === 0 ? null : (
+        {messages.map((message) => {
+          // An assistant turn with no text yet shows the thinking indicator
+          // rather than empty space. Once the first token lands the indicator
+          // gives way to the answer; work that starts AFTER text has streamed
+          // (a card being written mid-sentence) is covered by the skeletons in
+          // MessageBubble instead.
+          const isAwaitingFirstToken =
+            message.role === "assistant" && message.content.length === 0;
+
+          if (isAwaitingFirstToken && !message.pending) return null;
+
+          return (
             <div key={message.id} data-mid={message.id} data-role={message.role}>
-              <MessageBubble message={message} />
+              {isAwaitingFirstToken ? (
+                <ThinkingIndicator stage={message.thinkingStage} />
+              ) : (
+                <MessageBubble message={message} />
+              )}
             </div>
-          )
-        )}
+          );
+        })}
         {/* Dynamic spacer: keeps enough scroll range to pin the latest question
             to the top. Shrinks to 0 as a long answer fills the viewport. */}
         <div ref={spacerRef} aria-hidden />
