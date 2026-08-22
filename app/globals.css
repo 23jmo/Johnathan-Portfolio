@@ -172,28 +172,29 @@ body.scrollchat-locked {
   );
 }
 
-/* The viewport-framing glow: a hue-cycling conic gradient masked to a soft
-   border ring (transparent center → opaque edges), blurred into a glow. The
-   radial mask is farthest-at-corners, so corners light up most. */
-@property --sc-angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
+/* The viewport-framing glow is baked as a 1102px square, then rendered at a
+   minimum 2x size. 142vmax keeps the square at least as large as the viewport
+   diagonal on displays beyond 1080p, so rotation can never uncover a corner.
+   The formerly elliptical viewport mask is baked circularly into the square:
+   its edge weighting stays fixed while the conic colors rotate. Regenerate via
+   `node scripts/generate-scrollchat-glow.mjs` if the palette or mask changes. */
+.scrollchat-screenglow-rotator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(2204px, 142vmax);
+  aspect-ratio: 1;
+  transform-origin: center;
+  will-change: transform;
+  animation: scrollchat-glow-rotate 7s linear infinite;
 }
 
 .scrollchat-screenglow {
-  background: conic-gradient(
-    from var(--sc-angle),
-    #ff2d55, #ff9500, #ffcc00, #34c759, #32ade6, #007aff, #af52de, #ff2d55
-  );
-  /* Wide colored band hugging the edges (transparent center → opaque edge), so
-     the rainbow reads as a vivid frame rather than a thin muddy ring. */
-  -webkit-mask: radial-gradient(125% 125% at 50% 50%, transparent 38%, #000 74%);
-  mask: radial-gradient(125% 125% at 50% 50%, transparent 38%, #000 74%);
+  background: url("/images/scrollchat/screen-glow.png") center / 100% 100%
+    no-repeat;
   filter: blur(26px) saturate(1.8) brightness(1.25);
-  /* Slowly rotate the hue around the frame + gently breathe the intensity. */
-  animation: scrollchat-glow-rotate 7s linear infinite,
-    scrollchat-aurora-breathe 4.5s ease-in-out infinite;
+  /* Opacity breathes independently while the shared parent rotates both copies. */
+  animation: scrollchat-aurora-breathe 4.5s ease-in-out infinite;
 }
 
 /* The brighter "flash" copy stacked on top — opacity is driven by keystroke
@@ -201,17 +202,23 @@ body.scrollchat-locked {
    blur) + brighter so each keystroke visibly punches through. */
 .scrollchat-screenglow--bright {
   filter: blur(15px) saturate(2) brightness(1.8);
-  animation: scrollchat-glow-rotate 7s linear infinite;
+  animation: none;
 }
 
 /* Reduced-motion: a quiet, still frame at a fixed intensity. */
+.scrollchat-screenglow-rotator--static {
+  transform: translate3d(-50%, -50%, 0);
+  animation: none;
+}
+
 .scrollchat-screenglow--static {
   animation: none;
   opacity: 0.6;
 }
 
 @keyframes scrollchat-glow-rotate {
-  to { --sc-angle: 360deg; }
+  from { transform: translate3d(-50%, -50%, 0) rotate(0deg); }
+  to { transform: translate3d(-50%, -50%, 0) rotate(360deg); }
 }
 
 @keyframes scrollchat-aurora-breathe {
