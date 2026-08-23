@@ -28,12 +28,11 @@ import {
   CLOSE_PROGRESS_SPRING,
   COMMIT_VELOCITY_MAX,
   FLY_OVERLAP_TRIGGER,
-  FLY_SPRING,
-  PROGRESS_SPRING,
   REVERSING_WATCHDOG_MS,
   pageContextFromPath,
   type ScrollChatPhase,
 } from "@/lib/scrollchat/state";
+import { tuning } from "@/lib/scrollchat/tuning";
 import { playCommit, playReverse } from "@/lib/scrollchat/audio";
 import { getStoredName, storeName } from "@/lib/scrollchat/identity";
 
@@ -188,7 +187,7 @@ export default function ScrollChatProvider({
         if (flyStarted) return;
         flyStarted = true;
         flyRef.current = animate(fly, 1, {
-          ...FLY_SPRING,
+          ...tuning.flySpring,
           onComplete: () => setPhase("chat"),
         });
       };
@@ -206,7 +205,7 @@ export default function ScrollChatProvider({
       if (progress.get() >= FLY_OVERLAP_TRIGGER) startFly();
 
       warpRef.current = animate(progress, 1, {
-        ...PROGRESS_SPRING,
+        ...tuning.progressSpring,
         velocity: launchVelocity,
         // onUpdate dies with warpRef.current.stop(), so cancellation is free —
         // no subscription to clean up in close()/the next open()/unmount.

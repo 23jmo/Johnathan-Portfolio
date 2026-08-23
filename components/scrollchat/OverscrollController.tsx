@@ -5,16 +5,10 @@ import { animate } from "framer-motion";
 import { useScrollChat } from "./ScrollChatProvider";
 import {
   ARM_ACCENT_RESET_RATIO,
-  BOTTOM_DWELL_MS,
-  COMMIT_RATIO,
   GESTURE_ARM_GAP,
-  GESTURE_THRESHOLD,
-  MOMENTUM_ATTENUATION,
-  MOMENTUM_PROGRESS_CAP,
-  PROGRESS_SPRING,
   REARM_COOLDOWN,
-  WHEEL_STREAM_GAP,
 } from "@/lib/scrollchat/state";
+import { tuning } from "@/lib/scrollchat/tuning";
 import { ensureAudio, playArm, playDialTick } from "@/lib/scrollchat/audio";
 
 /** ms gap with no wheel/touch input before a pull counts as "released". */
@@ -26,7 +20,7 @@ const RELEASE_MS = 110;
  *
  *  - Engages only at the document bottom while pushing further down.
  *  - Accumulates a px budget → progress = budget / THRESHOLD (clamped 0..1).
- *  - On release: commits into the chat if progress ≥ COMMIT_RATIO, otherwise
+ *  - On release: commits into the chat if progress ≥ the commit ratio, else
  *    springs progress back to 0 with a snappy little bounce.
  *  - ARMS while the visitor is within GESTURE_ARM_GAP of the footer. Arming is
  *    purely a cost-scheduling boundary — it changes nothing about how the
@@ -49,7 +43,7 @@ export default function OverscrollController() {
   // tell a fresh, deliberate pull from the momentum tail of an earlier scroll.
   const lastWheelAt = useRef(0);
   // When the page ARRIVED at the bottom (null while away from it). A pull only
-  // arms after the page has SETTLED there for BOTTOM_DWELL_MS.
+  // arms after the page has SETTLED there for the bottom-dwell window.
   const bottomSince = useRef<number | null>(null);
   const cooldownUntil = useRef(0);
   const phaseRef = useRef(phase);
@@ -57,7 +51,7 @@ export default function OverscrollController() {
   const springRef = useRef<ReturnType<typeof animate> | null>(null);
   const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTickStep = useRef(-1);
-  // One-shot "armed" accent (crossed COMMIT_RATIO — release now = commit).
+  // One-shot "armed" accent (crossed the commit ratio — release now = commit).
   const armAccentFired = useRef(false);
   // True while the ACTIVE pull was started by momentum spill (an inertia tail),
   // not a deliberate gesture — fed at a reduced, capped rate so it nudges but
@@ -118,7 +112,7 @@ export default function OverscrollController() {
     // The page has SETTLED at the bottom (not just arrived mid-inertia).
     const dwellMet = () =>
       bottomSince.current !== null &&
-      performance.now() - bottomSince.current >= BOTTOM_DWELL_MS;
+      performance.now() - bottomSince.current >= tuning.bottomDwellMs;
 
     const stopSpring = () => {
       springRef.current?.stop();
@@ -126,7 +120,7 @@ export default function OverscrollController() {
     };
 
     const setFromBudget = () => {
-      const ratio = Math.min(1, budget.current / GESTURE_THRESHOLD);
+      const ratio = Math.min(1, budget.current / tuning.gestureThreshold);
       progress.set(ratio);
       // Momentum nudges are purely visual — no dial ticks / haptics / arm
       // accent, so leftover scroll doesn't chirp or buzz.
@@ -140,7 +134,7 @@ export default function OverscrollController() {
         // One-shot accent on crossing the commit threshold, with hysteresis
         // (re-arms only below ARM_ACCENT_RESET_RATIO) so hovering around the
         // line doesn't chatter the cue.
-        if (!armAccentFired.current && ratio >= COMMIT_RATIO) {
+        if (!armAccentFired.current && ratio >= tuning.commitRatio) {
           armAccentFired.current = true;
           playArm();
           vibrate(18);
@@ -164,13 +158,13 @@ export default function OverscrollController() {
     const endPull = () => {
       if (!pulling.current) return;
       pulling.current = false;
-      const ratio = Math.min(1, budget.current / GESTURE_THRESHOLD);
+      const ratio = Math.min(1, budget.current / tuning.gestureThreshold);
       budget.current = 0;
       lastTickStep.current = -1;
       armAccentFired.current = false;
       momentumOnly.current = false;
 
-      if (ratio >= COMMIT_RATIO) {
+      if (ratio >= tuning.commitRatio) {
         if (!reducedMotion) vibrate([12, 8, 20]);
         open(); // provider springs progress → 1, phase warping → chat
         return;
@@ -181,7 +175,7 @@ export default function OverscrollController() {
         return;
       }
       springRef.current = animate(progress, 0, {
-        ...PROGRESS_SPRING,
+        ...tuning.progressSpring,
         onComplete: () => {
           springRef.current = null;
         },
@@ -191,10 +185,10 @@ export default function OverscrollController() {
     const applyDelta = (delta: number) => {
       // Momentum pulls feed at a fraction of full strength and are capped well
       // below the commit line — they bulge the page a little, then spring back.
-      const scaled = momentumOnly.current ? delta * MOMENTUM_ATTENUATION : delta;
+      const scaled = momentumOnly.current ? delta * tuning.momentumAttenuation : delta;
       const ceiling = momentumOnly.current
-        ? GESTURE_THRESHOLD * MOMENTUM_PROGRESS_CAP
-        : GESTURE_THRESHOLD * 1.15;
+        ? tuning.gestureThreshold * tuning.momentumProgressCap
+        : tuning.gestureThreshold * 1.15;
       budget.current = Math.min(ceiling, Math.max(0, budget.current + scaled));
       const ratio = setFromBudget();
       if (ratio >= 1) {
@@ -227,7 +221,7 @@ export default function OverscrollController() {
         // the inertia tail of the scroll that carried us here — allowed to
         // nudge the warp, but attenuated + capped so it can't commit.
         momentumOnly.current =
-          sinceLastWheel < WHEEL_STREAM_GAP || !dwellMet();
+          sinceLastWheel < tuning.wheelStreamGap || !dwellMet();
       }
       ensureAudio();
       e.preventDefault();
@@ -264,11 +258,11 @@ export default function OverscrollController() {
         ensureAudio();
         e.preventDefault();
         beginPull();
-        applyDelta(delta * 2.2); // touch deltas are small; scale to feel right
+        applyDelta(delta * tuning.touchGain); // touch deltas are small; scale up
       } else if (pulling.current) {
         e.preventDefault();
         beginPull();
-        budget.current = Math.max(0, budget.current + delta * 2.2);
+        budget.current = Math.max(0, budget.current + delta * tuning.touchGain);
         setFromBudget();
         scheduleRelease();
       }

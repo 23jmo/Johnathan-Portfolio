@@ -9,6 +9,7 @@ import {
 } from "react";
 import { usePathname } from "next/navigation";
 import { useScrollChat } from "./ScrollChatProvider";
+import { tuning } from "@/lib/scrollchat/tuning";
 import ChatFooter from "./ChatFooter";
 import { CHIP_DIAMETER, CHIP_CENTER_FROM_BOTTOM } from "@/lib/scrollchat/chip";
 import glassMapManifest from "@/lib/scrollchat/glassMapManifest.json";
@@ -122,6 +123,19 @@ const CIRCLE_MIN_RADIUS = 66;
  * number deciding how large the static filter region has to be.
  */
 const PORTHOLE_MAX_RADIUS_FACTOR = 1.25;
+
+/**
+ * Ceiling on the page counter-scale (see `pageCounterScale` in the warp loop).
+ *
+ * Holding the page at 1:1 while the porthole shrinks to CIRCLE_MIN_RADIUS would
+ * need a counter-scale of r0 / 66 — around 17x — and every frame of the pull
+ * hands Blink a transform it has never seen, so it cannot reuse a raster the way
+ * it can for a compositor-driven scale animation. The clamp bounds that worst
+ * case: past it the page resumes shrinking with the glass, which is also the
+ * more legible ending, since a 17x crop of the page through a 66px hole is a few
+ * enormous letters.
+ */
+const MAX_PAGE_COUNTER_SCALE = 4;
 
 /**
  * The two lens images, baked at build time by scripts/generate-glass-maps.mjs.
@@ -348,6 +362,7 @@ export default function PageWarp({ children }: { children: ReactNode }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const clipRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   // One displacement node per colour channel (see GLASS_CHANNELS). Their three
   // `scale` values are the ONLY filter attributes still written during the
   // gesture, and they are always written together in one frame, so the fringe
@@ -524,6 +539,16 @@ export default function PageWarp({ children }: { children: ReactNode }) {
       // lift doesn't move), so we paint it onto the clip layer for the warp.
       // transform-origin also pins here: the clip pivots BOTH the warp shrink
       // and the fly scale at the sphere centre (cx, cyDoc).
+      // Same pivot as the clip layer: the page must counter-scale about the
+      // sphere centre, or it would slide out from under the porthole. Its box
+      // starts at the document origin like the clip's, so (cx, cyDoc) is the
+      // same point in both.
+      const page = pageRef.current;
+      if (page) {
+        page.style.transformOrigin = `${cx}px ${cyDoc}px`;
+        page.style.willChange = "transform";
+      }
+
       const k = clipRef.current;
       if (k) {
         k.style.background = "var(--background)";
@@ -600,6 +625,12 @@ export default function PageWarp({ children }: { children: ReactNode }) {
         sheen.style.height = "";
         sheen.style.left = "";
         sheen.style.top = "";
+      }
+      const page = pageRef.current;
+      if (page) {
+        page.style.transform = "";
+        page.style.transformOrigin = "";
+        page.style.willChange = "";
       }
       if (c) {
         c.style.transform = "";
@@ -772,6 +803,32 @@ export default function PageWarp({ children }: { children: ReactNode }) {
       k.style.transform = `translate(${TX}px, ${TY}px) scale(${Sx * warpScale}, ${
         Sy * warpScale
       })`;
+
+      // PAGE ZOOM — how much of that shrink the PAGE has to follow. The clip
+      // layer's scale moves the porthole and the page together, so the only way
+      // to hold the page still is to undo part of it from the inside.
+      //
+      // pageScale = warpScale ** pageZoom interpolates GEOMETRICALLY between the
+      // two ends, which is the right space for a scale: 1 leaves the page pinned
+      // to the porthole (the shipped look — the chip is the whole page in
+      // miniature), 0 holds it at 1:1 so the glass closes over a stationary page
+      // like a lens, and the values between let it recede a little while the
+      // glass does most of the travel. The counter-scale is whatever is left
+      // over once the clip layer has had its share.
+      const pageScale = Math.pow(warpScale, tuning.pageZoom);
+      const pageCounterScale = Math.min(
+        MAX_PAGE_COUNTER_SCALE,
+        pageScale / warpScale
+      );
+      const pageLayer = pageRef.current;
+      if (pageLayer) {
+        // Exactly 1 is written as the empty string so the layer carries no
+        // transform at all at pageZoom 1 — that keeps the shipped path byte-for-
+        // byte what it was, with no extra transformed layer between the filter
+        // and the page.
+        pageLayer.style.transform =
+          pageCounterScale === 1 ? "" : `scale(${pageCounterScale})`;
+      }
 
       // HANDOFF — dissolve the page-sphere over the fly's back half so only the
       // designed in-input chip (revealed beneath) remains; without it the raw
@@ -1072,7 +1129,16 @@ export default function PageWarp({ children }: { children: ReactNode }) {
             lens filter, evaluated once at r0 and scaled by the outer transform. */}
         <div ref={clipRef} data-warp-clip>
           <div ref={contentRef} data-warp-content>
-            {children}
+            {/* PAGE ZOOM — a counter-scale that decides how much of the
+                porthole's shrink the page itself has to follow. A CHILD of the
+                filtered element on purpose: filters run before transforms, so a
+                transform on data-warp-content would scale the filter's OUTPUT
+                and throw the lens rim off the porthole edge. Down here the
+                counter-scale is just more content for the filter to read, and
+                the graph stays evaluated at r0 in an untransformed space. */}
+            <div ref={pageRef} data-warp-page>
+              {children}
+            </div>
           </div>
         </div>
         {/* Glass BODY overlay — sits ABOVE the page-sphere (z 9997 > clip 9996).
