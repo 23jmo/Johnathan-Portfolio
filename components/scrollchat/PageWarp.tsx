@@ -13,6 +13,7 @@ import { tuning } from "@/lib/scrollchat/tuning";
 import ChatFooter from "./ChatFooter";
 import { CHIP_DIAMETER, CHIP_CENTER_FROM_BOTTOM } from "@/lib/scrollchat/chip";
 import glassMapManifest from "@/lib/scrollchat/glassMapManifest.json";
+import { glassTuning, useGlassMaps } from "@/lib/scrollchat/glassTuning";
 
 /**
  * Warps the live page into the chat as the visitor pulls past the bottom. The
@@ -74,8 +75,13 @@ import glassMapManifest from "@/lib/scrollchat/glassMapManifest.json";
  * gradient) still magnifies as a single clean image. REFRACT also sets the
  * absolute pixel displacement (r×BEZEL×REFRACT), so it's kept high to pull
  * content far, not merely stretch it.
+ *
+ * Lives in `glassTuning` rather than as a constant here because `GlassDials`
+ * moves it, and because it also feeds the BAKE: the magnify lobe's weight is
+ * derived against it, so a map and a refract value are a matched pair. See
+ * `lib/scrollchat/glassProfile.mjs`.
  */
-const GLASS_REFRACT = 0.88;
+// (value: glassTuning.refract)
 
 /**
  * Chromatic aberration spread: the fractional difference in rim-refraction
@@ -83,7 +89,7 @@ const GLASS_REFRACT = 0.88;
  * glass). Because the refraction only lives in the bezel, this splits the
  * channels into prismatic colour ONLY at the sphere's edge — never the centre.
  */
-const CHROMATIC_SPREAD = 0.16;
+// (value: glassTuning.chromatic)
 
 /**
  * The three colour channels of the chromatic-aberration pass. Each refracts the
@@ -145,8 +151,39 @@ const MAX_PAGE_COUNTER_SCALE = 4;
  * `canvas.toDataURL()`, on the main thread, at mount) was paying a runtime cost
  * for a build-time constant.
  */
-const GLASS_MAP_URL = "/scrollchat/glass-map.png";
-const GLASS_RIM_MASK_URL = "/scrollchat/glass-rim-mask.png";
+// The URLs come from `useGlassMaps()` — the baked paths in production, or
+// freshly re-baked `data:` URLs while `GlassDials` is mounted in dev.
+
+/**
+ * Which construction draws the glass BODY. Temporary A/B switch.
+ *
+ *  - "painted"  the shipped look: three radial gradients plus four box-shadows
+ *               on the rim, rewritten as the sphere crosses size rungs.
+ *  - "specular" the gradients and the rim shadows are gone entirely, and the
+ *               highlight is computed by feSpecularLighting from the sphere's
+ *               real normals inside the existing filter graph.
+ *
+ * Once the comparison settles, the loser and this switch both get deleted.
+ */
+type GlassStyle = "painted" | "specular" | "hybrid";
+const GLASS_STYLE = "painted" as GlassStyle;
+
+/**
+ * Height of the specular surface, as a fraction of r0.
+ *
+ * feSpecularLighting differences `alpha * surfaceScale` against the pixel grid,
+ * so this converts the height map's 0..1 alpha into real user units. The map is
+ * a rounded EDGE spanning the bezel, not a hemisphere (see the generator), so
+ * the matching height is the bezel's own width: slope 1 at mid-bezel, vertical
+ * at the rim, which is where the highlight belongs.
+ */
+const SPECULAR_SURFACE_SCALE = glassMapManifest.bezel;
+/** Phong ks. How much light the glass throws back overall. */
+const SPECULAR_CONSTANT = GLASS_STYLE === "painted" ? 0 : 1.6;
+/** Phong shininess. Higher = a tighter, harder glint; lower = a broad sheen. */
+const SPECULAR_EXPONENT = 30;
+/** How far the key light sits off the surface, as a fraction of r0. */
+const SPECULAR_LIGHT_HEIGHT = 1.2;
 
 /**
  * Fraction of the radius occupied by the refracting bezel: the inner (1 − BEZEL)
@@ -158,7 +195,7 @@ const GLASS_RIM_MASK_URL = "/scrollchat/glass-rim-mask.png";
  * failure the day someone re-tunes the lens: the refraction would simply stop
  * lining up with the sphere's rim.
  */
-const GLASS_BEZEL = glassMapManifest.bezel;
+// (value: glassTuning.bezel)
 
 /**
  * Edge blur — the rim softly blurs the refracted content so it "melds" through
@@ -170,7 +207,7 @@ const GLASS_BEZEL = glassMapManifest.bezel;
  * r/r0 it lands back on r × BLUR_FRACTION, exactly what the per-frame write used
  * to produce.
  */
-const BLUR_FRACTION = 0.06;
+// (value: glassTuning.blurFraction)
 
 /**
  * The glass-body sheen is a FIXED-SIZE box that the gesture transform scales, so
@@ -359,6 +396,12 @@ interface WarpGeometry {
 export default function PageWarp({ children }: { children: ReactNode }) {
   const { progress, fly, phase, reducedMotion, armed } = useScrollChat();
   const pathname = usePathname();
+  // The lens images and the frost radius. Constant in production; re-baked into
+  // `data:` URLs on every dial drag while `GlassDials` is mounted in dev. The
+  // rest of the profile is read imperatively from `glassTuning` instead, because
+  // the rAF loop below cannot consume a hook's value and restarting it on every
+  // drag would change the very feel being tuned.
+  const glassMaps = useGlassMaps();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const clipRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -414,7 +457,7 @@ export default function PageWarp({ children }: { children: ReactNode }) {
     // for why the region is the disc and not the viewport, and why clipping it
     // to the page costs nothing. The margin is the edge blur's 3σ, so the rim
     // blur still has every source pixel it can reach.
-    const blurMargin = referenceRadius * BLUR_FRACTION * 3;
+    const blurMargin = referenceRadius * glassTuning.blurFraction * 3;
     const filterX = Math.max(centerX - referenceRadius, -blurMargin);
     const filterY = Math.max(centerY - referenceRadius, -blurMargin);
     const filterRight = Math.min(centerX + referenceRadius, pageWidth + blurMargin);
@@ -448,12 +491,15 @@ export default function PageWarp({ children }: { children: ReactNode }) {
   // resolve, at a moment where the work costs nothing.
   useEffect(() => {
     if (reducedMotion) return;
-    for (const url of [GLASS_MAP_URL, GLASS_RIM_MASK_URL]) {
+    for (const url of [glassMaps.mapUrl, glassMaps.rimMaskUrl, glassMaps.heightUrl]) {
       const warmImage = new Image();
       warmImage.src = url;
       void warmImage.decode().catch(() => {});
     }
-  }, [reducedMotion]);
+    // Re-warms whenever the URLs change, which in production is never (they are
+    // three module constants) and in dev is every dial drag — exactly when a
+    // fresh `data:` URL most wants decoding before the filter reaches for it.
+  }, [reducedMotion, glassMaps.mapUrl, glassMaps.rimMaskUrl, glassMaps.heightUrl]);
 
   // Drive the warp straight from progress + fly; clear ALL inline styles at rest
   // so exiting the chat restores a pristine page.
@@ -706,7 +752,7 @@ export default function PageWarp({ children }: { children: ReactNode }) {
       // compositor ends up producing — the attribute written below is the same
       // quantity at r0, which scale(r/r0) brings back to exactly this.
       const screenRefraction =
-        portholeRadius * GLASS_BEZEL * GLASS_REFRACT * refractionEnvelope;
+        portholeRadius * glassTuning.bezel * glassTuning.refract * refractionEnvelope;
       const filterActive = hasDef && screenRefraction > 0.3;
 
       // INNER (contentRef): ONLY the glass lens — no whole-page brightness/blur/
@@ -731,8 +777,8 @@ export default function PageWarp({ children }: { children: ReactNode }) {
         // it — blue bends more, red less — so the mismatch fringes the rim, and
         // only the rim, with prismatic colour.
         const glassScale =
-          -referenceRadius * GLASS_BEZEL * GLASS_REFRACT * refractionEnvelope;
-        const spread = glassScale * CHROMATIC_SPREAD;
+          -referenceRadius * glassTuning.bezel * glassTuning.refract * refractionEnvelope;
+        const spread = glassScale * glassTuning.chromatic;
         const channelScales = [
           glassScale - spread,
           glassScale,
@@ -863,8 +909,13 @@ export default function PageWarp({ children }: { children: ReactNode }) {
         // part of what the element is under; `S` and not `Sx`/`Sy` because
         // box-shadow has no anisotropic form and the liquid wobble is a ±7%
         // squash, far under a pixel of rim.
+        // The four rim shadows are the painted EDGE. In "specular" mode the
+        // filter's highlight runs vertical at the rim and draws it for real,
+        // so these are skipped — which also retires the most expensive write
+        // in the loop (a box-shadow rewrite repaints, and measures heavier
+        // than the whole filter graph).
         const rim = rimRef.current;
-        if (rim && sheenAlpha > SHEEN_VISIBLE_ALPHA) {
+        if (rim && GLASS_STYLE !== "specular" && sheenAlpha > SHEEN_VISIBLE_ALPHA) {
           const exactRung =
             Math.log(S * sheenScale) / Math.log(SHEEN_RIM_STEP);
           const rimDeadband =
@@ -1038,7 +1089,7 @@ export default function PageWarp({ children }: { children: ReactNode }) {
                   refraction. This used to be repositioned every frame to chase
                   the shrinking sphere; now the sphere is scaled onto IT. */}
               <feImage
-                href={GLASS_MAP_URL}
+                href={glassMaps.mapUrl}
                 x={geometry.centerX - geometry.referenceRadius}
                 y={geometry.centerY - geometry.referenceRadius}
                 width={geometry.referenceRadius * 2}
@@ -1095,7 +1146,7 @@ export default function PageWarp({ children }: { children: ReactNode }) {
                   geometry and the blur radius are pinned to r0 like the glass
                   map, so the compositor scales both back onto the sphere. */}
               <feImage
-                href={GLASS_RIM_MASK_URL}
+                href={glassMaps.rimMaskUrl}
                 x={geometry.centerX - geometry.referenceRadius}
                 y={geometry.centerY - geometry.referenceRadius}
                 width={geometry.referenceRadius * 2}
@@ -1105,7 +1156,7 @@ export default function PageWarp({ children }: { children: ReactNode }) {
               />
               <feGaussianBlur
                 in="sharp"
-                stdDeviation={geometry.referenceRadius * BLUR_FRACTION}
+                stdDeviation={geometry.referenceRadius * glassMaps.blurFraction}
                 result="blurred"
               />
               <feComposite
@@ -1114,7 +1165,81 @@ export default function PageWarp({ children }: { children: ReactNode }) {
                 operator="in"
                 result="blurrim"
               />
-              <feComposite in="blurrim" in2="sharp" operator="over" />
+              {GLASS_STYLE === "painted" ? (
+                <feComposite in="blurrim" in2="sharp" operator="over" />
+              ) : (
+                <>
+                <feComposite
+                  in="blurrim"
+                  in2="sharp"
+                  operator="over"
+                  result="refracted"
+                />
+
+                {/* SPECULAR — the glass's own reflected light, COMPUTED rather
+                    than painted.
+
+                    The three radial gradients this replaces could never respond to
+                    the sphere: a gradient does not know which way the surface
+                    faces, so it drew the same ellipses at every size, every wobble
+                    and over every background. feSpecularLighting builds real
+                    surface normals by differencing the height map's alpha and runs
+                    a Phong term against a positioned light, so the highlight moves
+                    correctly across the curve and goes vertical at the rim — which
+                    is what produces a bright edge for the same reason Fresnel does,
+                    instead of a hand-drawn ring.
+
+                    Pinned to r0 like every other node here, so the gesture's
+                    compositor scale carries it down onto the shrinking sphere and
+                    it inherits the same raster discount as the rest of the graph. */}
+                <feImage
+                  href={glassMaps.heightUrl}
+                  x={geometry.centerX - geometry.referenceRadius}
+                  y={geometry.centerY - geometry.referenceRadius}
+                  width={geometry.referenceRadius * 2}
+                  height={geometry.referenceRadius * 2}
+                  preserveAspectRatio="none"
+                  result="heightmap"
+                />
+                <feSpecularLighting
+                  in="heightmap"
+                  surfaceScale={geometry.referenceRadius * SPECULAR_SURFACE_SCALE}
+                  specularConstant={SPECULAR_CONSTANT}
+                  specularExponent={SPECULAR_EXPONENT}
+                  lightingColor="#ffffff"
+                  result="specular"
+                >
+                  {/* Up and to the left, and well off the surface — the same key
+                      direction the painted glint used, now as an actual light
+                      position rather than a gradient centre. */}
+                  <fePointLight
+                    x={geometry.centerX - geometry.referenceRadius * 0.45}
+                    y={geometry.centerY - geometry.referenceRadius * 0.55}
+                    z={geometry.referenceRadius * SPECULAR_LIGHT_HEIGHT}
+                  />
+                </feSpecularLighting>
+                {/* feSpecularLighting paints the WHOLE filter region; clip it back
+                    to the disc so no light lands outside the glass. */}
+                <feComposite
+                  in="specular"
+                  in2="heightmap"
+                  operator="in"
+                  result="specclipped"
+                />
+                {/* ADD it, rather than composite over: a highlight is light the
+                    glass sends toward the eye ON TOP of what it transmits, so it
+                    must brighten the refracted page, not replace it. */}
+                <feComposite
+                  in="refracted"
+                  in2="specclipped"
+                  operator="arithmetic"
+                  k1={0}
+                  k2={1}
+                  k3={1}
+                  k4={0}
+                />
+                </>
+              )}
             </filter>
           )}
         </defs>
@@ -1177,10 +1302,28 @@ export default function PageWarp({ children }: { children: ReactNode }) {
             // the only construction that holds their designed thickness at every
             // size. This element therefore carries NO box-shadow at all, so its
             // gradients are painted once and only ever re-composited.
-            background:
-              "radial-gradient(18% 23% at 29% 20%, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.5) 44%, rgba(255,255,255,0) 72%)," +
-              "radial-gradient(33% 41% at 33% 25%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0) 74%)," +
+            // Layers 1 and 2 are the painted GLINT — a bright strip and its
+            // halo, positioned by hand at 29%/20%. They are exactly the "painted
+            // optics" that cannot respond to the surface, and in "specular" mode
+            // feSpecularLighting computes that highlight from the real normals
+            // instead, so they are dropped.
+            //
+            // Layer 3 is the glass BODY, and it stays in both modes. It is a
+            // MATERIAL property (how much the glass tints and darkens toward its
+            // edge), not a faked optical event, and nothing in the filter graph
+            // can derive it: a Phong term adds light, it cannot subtract, and
+            // deriving a body from reflections needs an environment we do not
+            // have. Without it the sphere is a plain circular window onto the
+            // page and reads as a hole, not as glass.
+            background: [
+              ...(GLASS_STYLE === "painted"
+                ? [
+                    "radial-gradient(18% 23% at 29% 20%, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.5) 44%, rgba(255,255,255,0) 72%)",
+                    "radial-gradient(33% 41% at 33% 25%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0) 74%)",
+                  ]
+                : []),
               "radial-gradient(circle at 50% 50%, rgba(148,152,164,0.38) 0%, rgba(142,146,158,0.4) 42%, rgba(122,126,140,0.52) 66%, rgba(98,102,118,0.68) 85%, rgba(72,76,92,0.82) 95%, rgba(208,214,226,0.52) 100%)",
+            ].join(","),
           }}
         >
           {/* RIM — every box-shadow the glass has, on an element of its own.

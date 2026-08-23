@@ -6,9 +6,7 @@ import { useDialKit } from "dialkit";
 import { tuning } from "@/lib/scrollchat/tuning";
 import {
   BOTTOM_DWELL_MS,
-  COMMIT_RATIO,
   FLY_SPRING,
-  GESTURE_THRESHOLD,
   MOMENTUM_ATTENUATION,
   MOMENTUM_PROGRESS_CAP,
   PROGRESS_SPRING,
@@ -59,13 +57,12 @@ export default function ScrollChatDials() {
   const gesture = useDialKit("Scroll gesture", {
     // Pull distance for a full 0 -> 1 sweep. The headline "how hard is this to
     // scroll" number.
-    difficulty: [GESTURE_THRESHOLD, 200, 3000, 10] as [
-      number,
-      number,
-      number,
-      number,
-    ],
-    commitAt: [COMMIT_RATIO, 0.2, 0.95, 0.01] as [number, number, number, number],
+    // Tuned by hand on 2026-08-23, then pinned here. A much longer pull than
+    // the shipped GESTURE_THRESHOLD (2600 vs 1000) with a later commit line, so
+    // entering the chat is a deliberate haul rather than something a stray
+    // trackpad flick can trigger.
+    difficulty: [2600, 200, 3000, 10] as [number, number, number, number],
+    commitAt: [0.65, 0.2, 0.95, 0.01] as [number, number, number, number],
     touchGain: [2.2, 0.5, 6, 0.1] as [number, number, number, number],
   });
 

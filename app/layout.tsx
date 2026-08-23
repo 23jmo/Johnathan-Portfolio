@@ -7,6 +7,7 @@ import PaperAirplane from "@/components/ui/PaperAirplane";
 import SpotifyNowPlaying from "@/components/ui/SpotifyNowPlaying";
 import ScrollChatStage from "@/components/scrollchat/ScrollChatStage";
 import ScrollChatDials from "@/components/scrollchat/ScrollChatDials";
+import GlassDials from "@/components/scrollchat/GlassDials";
 import { Analytics } from "@vercel/analytics/next";
 import { Agentation } from "agentation";
 import { DialRoot } from "dialkit";
@@ -70,6 +71,7 @@ export default function RootLayout({
           {process.env.NODE_ENV === "development" && (
             <>
               <ScrollChatDials />
+              <GlassDials />
               <DialRoot position="bottom-left" theme="dark" />
             </>
           )}
