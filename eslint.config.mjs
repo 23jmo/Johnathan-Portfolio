@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Third-party source kept verbatim for comparison. Linting it only
+    // produces findings we must not act on without making it no longer a
+    // like-for-like reference.
+    "components/canvasui/**",
   ]),
 ]);
 

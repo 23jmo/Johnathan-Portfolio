@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import { motion, useTransform } from "framer-motion";
-import { COMMIT_RATIO } from "@/lib/scrollchat/state";
 import { useScrollChat } from "./ScrollChatProvider";
 import MessageList from "./MessageList";
 import ChatInput from "./ChatInput";
@@ -10,8 +9,8 @@ import NameGate from "./NameGate";
 
 /**
  * The AI chat — a STATIONARY full-screen layer that lives *behind* the page. It
- * doesn't slide in; it's simply revealed (an opacity dissolve bound to
- * `progress`) as the page above warps into a circle and flies off as the chip.
+ * doesn't slide in; it's simply revealed, by `OrbWarp` crossfading the page off
+ * it while a glass orb covers the screen.
  *
  * Deliberately Gemini-minimal: a clean dark field, a centered greeting when
  * empty, the conversation, and a single input pinned at the bottom. No seam, no
@@ -37,11 +36,13 @@ export default function ChatFooter() {
   const panelRef = useRef<HTMLDivElement>(null);
   const open = phase === "chat";
 
-  // The chat lives BEHIND the (now-opaque) page and is occluded by it except at
-  // the feathered bottom edge. Its opacity ramps gradually with the pull so the
-  // bottom peek starts VERY FAINT and reaches full only as you near the commit
-  // point — the page lifting/feathering away is what reveals it, softly.
-  const dissolve = useTransform(progress, [0, COMMIT_RATIO], [0, 1]);
+  // NO opacity ramp of its own any more. This used to dissolve in over
+  // [0, COMMIT_RATIO], which was the right curve when the page warped into a
+  // shrinking circle and the chat was revealed by the page getting out of the
+  // way. `OrbWarp` reveals it by crossfading instead, over a window chosen so
+  // the swap happens while the orb still covers the middle of the screen — and a
+  // second ramp here would multiply with that one, leaving the panel short of
+  // full opacity for exactly the stretch of the pull where it is most visible.
 
   // Fully retire the panel at rest: `visibility: hidden` removes it from
   // paint, hit-testing, and the compositor (opacity: 0 alone keeps the layer).
@@ -122,7 +123,6 @@ export default function ChatFooter() {
               pointerEvents: open ? "auto" : "none",
             }
           : {
-              opacity: dissolve,
               visibility: panelVisibility,
               pointerEvents: open ? "auto" : "none",
             }
@@ -130,7 +130,7 @@ export default function ChatFooter() {
       // `inset-0`: a full-screen stationary backdrop (NOT a rising footer). It's
       // outside any filtered/transformed ancestor in PageWarp's wrapper, so
       // fixed positioning resolves to the viewport.
-      className="scrollchat-panel fixed inset-0 z-[9994] flex flex-col text-white outline-none"
+      className="scrollchat-panel fixed inset-0 z-[9994] flex flex-col text-foreground outline-none"
     >
       {/* Minimal close affordance (Escape also works). */}
       <button
@@ -138,7 +138,7 @@ export default function ChatFooter() {
         onClick={close}
         aria-label="Close chat"
         tabIndex={open ? 0 : -1}
-        className="absolute right-4 top-4 z-10 rounded-full p-2 text-white/35 transition-colors hover:bg-white/5 hover:text-white/80"
+        className="absolute right-4 top-4 z-10 rounded-full p-2 text-foreground/35 transition-colors hover:bg-foreground/5 hover:text-foreground/80"
       >
         <svg
           viewBox="0 0 24 24"
@@ -160,10 +160,10 @@ export default function ChatFooter() {
             style={reducedMotion ? undefined : { y: greetingRise }}
             className="flex flex-1 flex-col items-center justify-center text-center"
           >
-            <h2 className="text-3xl font-medium tracking-tight text-white/90">
+            <h2 className="text-3xl font-medium tracking-tight text-foreground/90">
               Hi{userName ? ` ${userName}` : " there"}.
             </h2>
-            <p className="mt-2 text-base text-white/45">
+            <p className="mt-2 text-base text-foreground/45">
               Ask me anything about Johnathan.
             </p>
           </motion.div>

@@ -293,7 +293,7 @@ export async function POST(request: Request) {
           let assistantText = "";
           const toolCalls = new Map<
             number,
-            { id: string; name: string; args: string }
+            { id: string; name: string; args: string; announced: boolean }
           >();
           let finishReason: string | null = null;
 
@@ -312,10 +312,21 @@ export async function POST(request: Request) {
                 id: "",
                 name: "",
                 args: "",
+                announced: false,
               };
               if (tc.id) existing.id = tc.id;
               if (tc.function?.name) existing.name = tc.function.name;
               if (tc.function?.arguments) existing.args += tc.function.arguments;
+
+              // Announce the tool the moment its NAME arrives, long before its
+              // arguments finish streaming. Tool results are only emitted once
+              // the model stops talking, so without this the UI has no idea a
+              // card is being written and shows nothing for seconds.
+              if (existing.name && !existing.announced) {
+                existing.announced = true;
+                send({ type: "tool_start", name: existing.name });
+              }
+
               toolCalls.set(tc.index, existing);
             }
 

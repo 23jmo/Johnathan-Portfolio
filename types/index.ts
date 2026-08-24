@@ -123,7 +123,22 @@ export interface ChatMessage {
   youtube?: ChatYouTubeVideo[];
   /** True while the assistant message is still streaming. */
   pending?: boolean;
+  /**
+   * What the assistant is doing right now, driven by real tool-call events off
+   * the stream rather than a timer — so the thinking copy never claims work
+   * that isn't happening.
+   */
+  thinkingStage?: ThinkingStage;
+  /**
+   * A2UI surfaces the model has announced but not yet delivered. The route
+   * buffers tool arguments until the model stops talking, so this window can
+   * last seconds; each outstanding surface renders a skeleton in its place.
+   */
+  pendingSurfaceCount?: number;
 }
+
+/** Coarse description of the assistant's current work, for the indicator copy. */
+export type ThinkingStage = "thinking" | "sources" | "videos" | "surface";
 
 /** The page the user warped in from — becomes the context chip. */
 export interface PageContext {

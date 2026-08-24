@@ -3,7 +3,7 @@
 import { type ReactNode } from "react";
 import ScrollChatProvider, { useScrollChat } from "./ScrollChatProvider";
 import OverscrollController from "./OverscrollController";
-import PageWarp from "./PageWarp";
+import OrbWarp from "./OrbWarp";
 import ScreenGlow from "./ScreenGlow";
 
 /** Always-available, keyboard-reachable entry point (a11y: not gated behind a gesture). */
@@ -26,17 +26,17 @@ function AskButton() {
 
 /**
  * Root of the scroll-to-AI-chat experience. Unlike a modal overlay, this WRAPS
- * the page content (`PageWarp`) so the live page can warp into a circle as the
- * visitor pulls past the bottom, revealing the stationary `ChatFooter` that
- * lives behind it. `ScreenGlow` frames the viewport in AI mode. Mounted once in
- * app/layout.tsx around {children}.
+ * the page content (`OrbWarp`) so a glass orb can rise over the live page as the
+ * visitor pulls past the bottom, swapping it for the stationary `ChatFooter`
+ * behind it while it covers the screen. `ScreenGlow` frames the viewport in AI
+ * mode. Mounted once in app/layout.tsx around {children}.
  */
 export default function ScrollChatStage({ children }: { children: ReactNode }) {
   return (
     <ScrollChatProvider>
-      {/* PageWarp wraps the page AND renders ChatFooter (the stationary chat
+      {/* OrbWarp wraps the page AND renders ChatFooter (the stationary chat
           backdrop that lives behind the page) inside its wrapper. */}
-      <PageWarp>{children}</PageWarp>
+      <OrbWarp>{children}</OrbWarp>
       <ScreenGlow />
       <OverscrollController />
       <AskButton />

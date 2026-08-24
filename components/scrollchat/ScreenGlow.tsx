@@ -10,7 +10,7 @@ import { useScrollChat } from "./ScrollChatProvider";
 /**
  * Opacity the frame is held at while the gesture is merely ARMED — enough to
  * force Blink to paint (and therefore allocate + rasterize) the two stacked
- * full-viewport blurred conic layers, so that allocation is not still pending
+ * full-viewport blurred image layers, so that allocation is not still pending
  * when `reveal` lifts them into view mid-gesture.
  *
  * Chrome composites to 8-bit channels, so this contributes at most 0.001 x 255
@@ -53,6 +53,14 @@ export default function ScreenGlow() {
     ([revealed, isGestureArmed]: number[]) =>
       Math.max(revealed, isGestureArmed > 0 ? ARMED_PREWARM_OPACITY : 0)
   );
+  // `opacity: 0` alone leaves the transform animation ticking site-wide. Hide
+  // the whole glow subtree at true rest, then restore it at ARM TIME so Blink
+  // still gets the pre-gesture frame needed to allocate and rasterize it.
+  const glowVisibility = useTransform(
+    [progress, gestureArmed],
+    ([pullProgress, isGestureArmed]: number[]) =>
+      pullProgress > 0.001 || isGestureArmed > 0 ? "visible" : "hidden"
+  );
   // "Armed" accent: the bright layer steps up once the pull crosses the commit
   // threshold, then releases toward progress=1 so it never permanently washes
   // out the typing flash once in chat.
@@ -71,7 +79,11 @@ export default function ScreenGlow() {
     if (phase === "idle") return null;
     return (
       <div className="pointer-events-none fixed inset-0 z-[9998]">
-        <div className="scrollchat-screenglow scrollchat-screenglow--static absolute -inset-2" />
+        <div className="scrollchat-screenglow-frame">
+          <div className="scrollchat-screenglow-rotator scrollchat-screenglow-rotator--static">
+            <div className="scrollchat-screenglow scrollchat-screenglow--static absolute inset-0" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -79,16 +91,21 @@ export default function ScreenGlow() {
   return (
     <motion.div
       aria-hidden
-      style={{ opacity: revealPrewarmed }}
+      style={{ opacity: revealPrewarmed, visibility: glowVisibility }}
       className="pointer-events-none fixed inset-0 z-[9998]"
     >
-      {/* -inset-2 so the outer blur doesn't clip at the viewport edge. */}
-      <motion.div style={{ scale: pulseScale }} className="absolute -inset-2">
-        <div className="scrollchat-screenglow absolute inset-0" />
-        <motion.div
-          style={{ opacity: brightOpacity }}
-          className="scrollchat-screenglow scrollchat-screenglow--bright absolute inset-0"
-        />
+      <motion.div style={{ scale: pulseScale }} className="absolute inset-0">
+        {/* The static frame preserves the original viewport-relative mask. */}
+        <div className="scrollchat-screenglow-frame">
+          {/* One rotator keeps both filtered copies exactly phase-locked. */}
+          <div className="scrollchat-screenglow-rotator">
+            <div className="scrollchat-screenglow absolute inset-0" />
+            <motion.div
+              style={{ opacity: brightOpacity }}
+              className="scrollchat-screenglow scrollchat-screenglow--bright absolute inset-0"
+            />
+          </div>
+        </div>
       </motion.div>
     </motion.div>
   );

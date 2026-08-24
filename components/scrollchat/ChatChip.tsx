@@ -83,7 +83,7 @@ export default function ChatChip() {
           },
         }}
         style={{ background: "var(--background)" }}
-        className="relative h-full w-full overflow-hidden rounded-[9px] border border-white/15 shadow-[0_3px_10px_-3px_rgba(0,0,0,0.6)]"
+        className="relative h-full w-full overflow-hidden rounded-[9px] border border-foreground/15 shadow-[0_3px_10px_-3px_rgba(0,0,0,0.6)]"
       >
         {/* glossy diagonal sheen */}
         <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.55),transparent_45%)]" />

@@ -1,0 +1,16 @@
+{
+  "generatedBy": "scripts/generate-glass-maps.mjs",
+  "mapSize": 256,
+  "magnifyZoom": 1.12,
+  "magnifyExp": 1,
+  "bezel": 0.5,
+  "broadExp": 1.3,
+  "broadWeight": 0.16,
+  "rimBezel": 0.24,
+  "rimExp": 2.6,
+  "rimWeight": 0.35,
+  "blurInner": 0.8,
+  "refract": 0.91,
+  "chromatic": 0.1,
+  "blurFraction": 0.06
+}

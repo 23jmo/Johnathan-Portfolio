@@ -6,8 +6,14 @@ import ScrollProgress from "@/components/ui/ScrollProgress";
 import PaperAirplane from "@/components/ui/PaperAirplane";
 import SpotifyNowPlaying from "@/components/ui/SpotifyNowPlaying";
 import ScrollChatStage from "@/components/scrollchat/ScrollChatStage";
+import ScrollChatDials from "@/components/scrollchat/ScrollChatDials";
+import GlassDials from "@/components/scrollchat/GlassDials";
+import OrbDials from "@/components/scrollchat/OrbDials";
+import OrbScrubber from "@/components/scrollchat/OrbScrubber";
 import { Analytics } from "@vercel/analytics/next";
 import { Agentation } from "agentation";
+import { DialRoot } from "dialkit";
+import "dialkit/styles.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -58,6 +64,21 @@ export default function RootLayout({
               bottom, revealing the AI chat footer rising from below. */}
           <ScrollChatStage>{children}</ScrollChatStage>
           <SpotifyNowPlaying />
+          {/* Tuning panel for the scroll-chat gesture. A SIBLING of
+              ScrollChatStage, never a descendant: PageWarp puts a `filter` and a
+              `transform` on the page tree during the warp, and either one
+              re-bases `position: fixed` descendants — which would drag the panel
+              around with the sphere mid-gesture. Dev-only, so it is never
+              shipped to visitors. */}
+          {process.env.NODE_ENV === "development" && (
+            <>
+              <ScrollChatDials />
+              <GlassDials />
+              <OrbDials />
+              <OrbScrubber />
+              <DialRoot position="bottom-left" theme="dark" />
+            </>
+          )}
           <Analytics />
           {process.env.NODE_ENV === "development" && <Agentation />}
         </ThemeProvider>
