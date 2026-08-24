@@ -1,9 +1,9 @@
 "use client";
 
-import { Fragment, useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import LiquidGlassCanvas from "@/components/scrollchat/LiquidGlassCanvas";
 import Glass from "@/components/canvasui/Glass";
-import { glassTuning, useGlassMaps } from "@/lib/scrollchat/glassTuning";
+import RefractionFilter from "@/components/scrollchat/GlassRefractionFilter";
 
 /**
  * Scratch page for the liquid glass stack. Not linked from anywhere — it exists
@@ -19,21 +19,6 @@ import { glassTuning, useGlassMaps } from "@/lib/scrollchat/glassTuning";
  */
 
 const SPHERE_RADIUS = 120;
-
-/**
- * PageWarp's refraction constants, mirrored here so the demo and the shipping
- * warp describe the same lens. Changing one without the other is how the two
- * silently stop agreeing.
- */
-// Every number and image this filter needs now comes from `glassTuning` /
-// `useGlassMaps()`, the same pair PageWarp reads — so the demo and the shipping
-// warp cannot describe different lenses, and `GlassDials` moves both at once.
-
-const GLASS_CHANNELS = [
-  { key: "r", matrix: "1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" },
-  { key: "g", matrix: "0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" },
-  { key: "b", matrix: "0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" },
-] as const;
 
 function DemoContent() {
   return (
@@ -67,120 +52,6 @@ function DemoContent() {
         optically clean.
       </p>
     </div>
-  );
-}
-
-/**
- * The refraction filter — the same graph PageWarp ships, not a simplified one.
- *
- * Three things here are what produce the hard edge, and dropping any of them
- * gives the mushy blob a single displacement pass produces:
- *
- *  - The baked map concentrates the whole bend into the outermost ring
- *    (GLASS_RIM_EXP = 2.6 in the generator). The inner half of the bezel
- *    magnifies as one clean image; the very rim is driven far past the caustic,
- *    so content folds multiple times and smears into bands that wrap the
- *    silhouette. That fold IS the "completely distorts at the very edge" look —
- *    it is not a blur, it is refraction pushed past the point where the mapping
- *    stays one-to-one.
- *  - Each colour channel is displaced at a slightly different strength and the
- *    three are screened back together, which fringes that fold prismatically.
- *    Blue bends most, red least.
- *  - A Gaussian blur of the finished chromatic result, kept only where the rim
- *    mask is opaque and laid back OVER the crisp centre. This is the "melds
- *    through the edge" half; without it the fold reads as a hard meniscus.
- *
- * The flood underneath the map is load-bearing. `feImage` only paints where the
- * lens is; everywhere else the result is transparent black, which
- * `feDisplacementMap` reads as channel 0 — a full negative swing — and the rest
- * of the panel slides sideways. Compositing over a neutral grey flood makes "no
- * map here" mean "no displacement here".
- */
-function RefractionFilter({
-  id,
-  center,
-  radius,
-  box,
-}: {
-  id: string;
-  center: { x: number; y: number };
-  radius: number;
-  box: { width: number; height: number };
-}) {
-  // NEGATIVE is the magnify direction — edge content enlarged and wrapped
-  // around the curve, rather than fisheye compression toward the middle.
-  const glassMaps = useGlassMaps();
-  const glassScale = -radius * glassTuning.bezel * glassTuning.refract;
-  const spread = glassScale * glassTuning.chromatic;
-  const channelScales = [glassScale - spread, glassScale, glassScale + spread];
-
-  return (
-    <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
-      <filter
-        id={id}
-        filterUnits="userSpaceOnUse"
-        x={0}
-        y={0}
-        width={box.width}
-        height={box.height}
-        colorInterpolationFilters="sRGB"
-      >
-        <feFlood floodColor="rgb(128,128,128)" result="neutral" />
-        <feImage
-          href={glassMaps.mapUrl}
-          preserveAspectRatio="none"
-          x={center.x - radius}
-          y={center.y - radius}
-          width={radius * 2}
-          height={radius * 2}
-          result="ring"
-        />
-        <feComposite in="ring" in2="neutral" operator="over" result="map" />
-
-        {GLASS_CHANNELS.map((channel, index) => (
-          <Fragment key={channel.key}>
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="map"
-              scale={channelScales[index]}
-              xChannelSelector="R"
-              yChannelSelector="G"
-              result={`d${channel.key}`}
-            />
-            <feColorMatrix
-              in={`d${channel.key}`}
-              type="matrix"
-              values={channel.matrix}
-              result={`c${channel.key}`}
-            />
-          </Fragment>
-        ))}
-        <feBlend in="cr" in2="cg" mode="screen" result="crg" />
-        <feBlend in="crg" in2="cb" mode="screen" result="sharp" />
-
-        <feImage
-          href={glassMaps.rimMaskUrl}
-          preserveAspectRatio="none"
-          x={center.x - radius}
-          y={center.y - radius}
-          width={radius * 2}
-          height={radius * 2}
-          result="blurmask"
-        />
-        <feGaussianBlur
-          in="sharp"
-          stdDeviation={radius * glassMaps.blurFraction}
-          result="blurred"
-        />
-        <feComposite
-          in="blurred"
-          in2="blurmask"
-          operator="in"
-          result="blurrim"
-        />
-        <feComposite in="blurrim" in2="sharp" operator="over" />
-      </filter>
-    </svg>
   );
 }
 
