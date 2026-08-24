@@ -23,7 +23,7 @@ import { glassTuning, useGlassMaps } from "@/lib/scrollchat/glassTuning";
 // can describe a different lens, and `GlassDials` moves all of them at once.
 
 /**
- * How many wavelengths the dispersion is sampled at.
+ * How many wavelengths the dispersion is sampled at by default.
  *
  * This used to be 3 — one tap per colour channel — which is the obvious choice
  * and is wrong for anything sharp. A prism spreads a CONTINUUM; three samples
@@ -37,35 +37,43 @@ import { glassTuning, useGlassMaps } from "@/lib/scrollchat/glassTuning";
  * the hardest case precisely because it is sharp: every wavelength draws its own
  * hard-edged letter, so a coarse sampling shows up as banding exactly where
  * people are reading. Cost is one feDisplacementMap + feColorMatrix +
- * feComposite per tap over the filter region.
+ * feComposite per tap over the filter region — which is why the count is a knob
+ * at all: on a phone that region is two to three times a desktop's in device
+ * pixels, on a fraction of the GPU. See `spectrumFor` in `OrbWarp`, which is
+ * what decides the number, together with the matching `chromaticMaxPx`.
  */
-const CHROMATIC_SAMPLES: number = 8;
+export const REFERENCE_CHROMATIC_SAMPLES = 8;
 
 /**
- * The wavelength taps, as {bend, weight} pairs.
+ * The wavelength taps for a given sample count, as {bend, matrix} pairs.
  *
  * `bend` runs -1 (red, refracted least) to +1 (blue, refracted most) and scales
- * the dispersion offset. `weight` is how much each of R, G and B that wavelength
- * contributes, from overlapping triangular response curves centred on red,
- * green and blue — crude next to real colour-matching functions, but it puts the
- * hues in the right ORDER along the spread, which is the only thing the eye
- * reads as "prism" rather than "colour bug".
+ * the dispersion offset. The matrix is how much each of R, G and B that
+ * wavelength contributes, from overlapping triangular response curves centred on
+ * red, green and blue — crude next to real colour-matching functions, but it
+ * puts the hues in the right ORDER along the spread, which is the only thing the
+ * eye reads as "prism" rather than "colour bug".
  *
  * The weights are normalised so each channel's column sums to exactly 1. That
- * is what makes the taps summable: anywhere the displacement is uniform, all
- * eight taps land on the same pixel and add back to precisely the original
+ * is what makes the taps summable: anywhere the displacement is uniform, every
+ * tap lands on the same pixel and they add back to precisely the original
  * colour, so the clear middle of the lens is not tinted and the page outside it
  * is untouched. Skip the normalisation and the whole frame shifts hue.
+ *
+ * Memoised per count: the taps are a pure function of it, and this is called
+ * from a render that runs on every frame of the gesture.
  */
-const CHROMATIC_TAPS = (() => {
+const tapCache = new Map<number, { bend: number; matrix: string }[]>();
+
+function chromaticTaps(samples: number) {
+  const cached = tapCache.get(samples);
+  if (cached) return cached;
+
   const responseAt = (bend: number, centre: number) =>
     Math.max(0, 1 - Math.abs(bend - centre));
 
-  const taps = Array.from({ length: CHROMATIC_SAMPLES }, (_, index) => {
-    const bend =
-      CHROMATIC_SAMPLES === 1
-        ? 0
-        : (index / (CHROMATIC_SAMPLES - 1)) * 2 - 1;
+  const taps = Array.from({ length: samples }, (_, index) => {
+    const bend = samples === 1 ? 0 : (index / (samples - 1)) * 2 - 1;
     return {
       bend,
       weight: [responseAt(bend, -1), responseAt(bend, 0), responseAt(bend, 1)],
@@ -76,7 +84,7 @@ const CHROMATIC_TAPS = (() => {
     taps.reduce((total, tap) => total + tap.weight[channel], 0)
   );
 
-  return taps.map(({ bend, weight }) => ({
+  const built = taps.map(({ bend, weight }) => ({
     bend,
     matrix: [
       `${weight[0] / columnSums[0]} 0 0 0 0`,
@@ -85,7 +93,9 @@ const CHROMATIC_TAPS = (() => {
       `0 0 0 1 0`,
     ].join("  "),
   }));
-})();
+  tapCache.set(samples, built);
+  return built;
+}
 
 
 /**
@@ -123,6 +133,7 @@ export default function RefractionFilter({
   chromaticMaxPx = Infinity,
   frost = 1,
   chromaticRimOnly = 0,
+  samples = REFERENCE_CHROMATIC_SAMPLES,
 }: {
   id: string;
   center: { x: number; y: number };
@@ -185,10 +196,26 @@ export default function RefractionFilter({
    * same image the frost uses, so its ramp already starts at `blurInner`.
    */
   chromaticRimOnly?: number;
+  /**
+   * How many wavelengths to sample the spectrum at. Defaults to the tuned
+   * `REFERENCE_CHROMATIC_SAMPLES`.
+   *
+   * Lowering it is the only lever that actually cuts this graph's cost — every
+   * other primitive here is paid once, while the taps are paid per sample over
+   * the whole region. It is not free: fewer taps must come with a proportionally
+   * smaller `chromaticMaxPx`, or the gap between adjacent taps grows past the
+   * point where the eye fuses them and the fringe becomes ghosts.
+   */
+  samples?: number;
 }) {
   // NEGATIVE is the magnify direction — edge content enlarged and wrapped
   // around the curve, rather than fisheye compression toward the middle.
   const glassMaps = useGlassMaps();
+  // Floored at 2: the sum below is emitted by the `index > 0` branch, so a
+  // single tap would never produce the `chroma` result the rest of the graph
+  // reads. Two taps is already far too coarse to look at — the floor is a
+  // structural guard, not a supported setting.
+  const taps = chromaticTaps(Math.max(2, Math.round(samples)));
   const glassScale =
     -radius * glassTuning.bezel * glassTuning.refract * envelope;
   const spread =
@@ -228,7 +255,7 @@ export default function RefractionFilter({
           `feComposite operator="arithmetic"` with k2 = k3 = 1 is a plain sum,
           which is what a normalised spectrum needs to reconstruct its input.
         */}
-        {CHROMATIC_TAPS.map((tap, index) => (
+        {taps.map((tap, index) => (
           <Fragment key={tap.bend}>
             <feDisplacementMap
               in="SourceGraphic"
@@ -254,7 +281,7 @@ export default function RefractionFilter({
                 k3={1}
                 k4={0}
                 result={
-                  index === CHROMATIC_TAPS.length - 1
+                  index === taps.length - 1
                     ? "chroma"
                     : `sum${index}`
                 }

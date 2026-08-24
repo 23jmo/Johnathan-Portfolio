@@ -36,6 +36,7 @@ export default function OrbDials() {
     endRadius: [D.endRadius, 0.03, 0.5, 0.005] as Dial,
     startBelow: [D.startBelow, 0, 2, 0.05] as Dial,
     settleY: [D.settleY, 0, 1, 0.01] as Dial,
+    settleYPortrait: [D.settleYPortrait, 0, 1, 0.01] as Dial,
     riseBias: [D.riseBias, 1, 4, 0.05] as Dial,
   });
 
@@ -83,6 +84,7 @@ export default function OrbDials() {
       endRadius: motion.endRadius,
       startBelow: motion.startBelow,
       settleY: motion.settleY,
+      settleYPortrait: motion.settleYPortrait,
       riseBias: motion.riseBias,
 
       swapFrom: reveal.swapFrom,
@@ -115,6 +117,7 @@ export default function OrbDials() {
     motion.endRadius,
     motion.startBelow,
     motion.settleY,
+    motion.settleYPortrait,
     motion.riseBias,
     reveal.swapFrom,
     reveal.swapTo,

@@ -42,6 +42,32 @@ const RELEASE_MS = 260;
 const HOLD_MS = 420;
 
 /**
+ * The viewport height `tuning.touchGain` is calibrated against.
+ *
+ * The gain converts finger pixels into gesture budget, and the budget is a
+ * fixed number of pixels (`gestureThreshold`) — so a CONSTANT gain asks every
+ * device for the same swipe LENGTH. At the shipped 2.2 that is ~250px to reach
+ * the commit line: a quarter of a tall phone, but well over a third of a short
+ * one, and a third of the screen is more than a thumb gives without
+ * repositioning. Scaling the gain by REFERENCE / height asks for the same
+ * FRACTION of the screen instead, which is the quantity a thumb actually has.
+ *
+ * Chosen so the dialled value is used unchanged on a 1000px-tall viewport, i.e.
+ * a commit costs a quarter of the screen on every phone.
+ */
+const TOUCH_GAIN_REFERENCE_HEIGHT = 1000;
+
+/**
+ * Slack, in px, on "the page is at its bottom".
+ *
+ * `scrollHeight` and `clientHeight` are integers while `scrollY` is not, so a
+ * page pinned to its bottom on a high-density screen reports a gap of a pixel
+ * or so rather than exactly zero. Anything under a few pixels is that rounding,
+ * never a page the visitor can still scroll.
+ */
+const BOTTOM_EPSILON = 3;
+
+/**
  * Detects an overscroll-past-bottom gesture and feeds it into `progress`.
  * Renders nothing — it's all event wiring.
  *
@@ -113,11 +139,27 @@ export default function OverscrollController() {
   }, [phase]);
 
   useEffect(() => {
-    const docBottomGap = () =>
-      document.documentElement.scrollHeight -
-      (window.innerHeight + window.scrollY);
+    /*
+     * How far the page can still scroll down.
+     *
+     * `scrollHeight - clientHeight` is the real maximum scroll offset. The
+     * obvious `scrollHeight - (innerHeight + scrollY)` mixes the SCROLLING box
+     * with the VISUAL viewport, and on a phone those differ by the height of
+     * the URL bar for as long as it is on screen — so a page pinned to its
+     * bottom could report a gap of several dozen pixels and never arm the
+     * gesture at all.
+     */
+    const docBottomGap = () => {
+      const doc = document.documentElement;
+      return doc.scrollHeight - doc.clientHeight - window.scrollY;
+    };
 
-    const atBottom = () => docBottomGap() <= 2;
+    const atBottom = () => docBottomGap() <= BOTTOM_EPSILON;
+
+    // Refreshed alongside the bottom check rather than read per touchmove: it
+    // only changes on resize, and `clientHeight` inside the gesture's hot path
+    // is a layout read on every frame of a drag.
+    let touchGainScale = 1;
 
     // Stamp when the page reaches the bottom; clear the stamp when it leaves.
     // Driven by scroll events (covers wheel, keyboard, scrollbar, and touch
@@ -125,7 +167,10 @@ export default function OverscrollController() {
     const trackBottom = () => {
       // One layout read per event, shared by the dwell stamp and the arm check.
       const bottomGap = docBottomGap();
-      if (bottomGap <= 2) {
+      touchGainScale =
+        TOUCH_GAIN_REFERENCE_HEIGHT /
+        Math.max(1, document.documentElement.clientHeight);
+      if (bottomGap <= BOTTOM_EPSILON) {
         if (bottomSince.current === null) bottomSince.current = performance.now();
       } else {
         bottomSince.current = null;
@@ -349,11 +394,16 @@ export default function OverscrollController() {
         ensureAudio();
         e.preventDefault();
         beginPull();
-        applyDelta(delta * tuning.touchGain); // touch deltas are small; scale up
+        // Touch deltas are small; scale up — and scale WITH the screen, so the
+        // pull costs the same fraction of it on every phone.
+        applyDelta(delta * tuning.touchGain * touchGainScale);
       } else if (pulling.current) {
         e.preventDefault();
         beginPull();
-        budget.current = Math.max(0, budget.current + delta * tuning.touchGain);
+        budget.current = Math.max(
+          0,
+          budget.current + delta * tuning.touchGain * touchGainScale
+        );
         setFromBudget();
         scheduleRelease();
       }

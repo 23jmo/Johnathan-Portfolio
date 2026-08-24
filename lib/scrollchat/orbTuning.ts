@@ -33,6 +33,17 @@ export interface OrbTuning {
   startBelow: number;
   /** Where the settled bubble ends up, as a fraction of viewport height. */
   settleY: number;
+  /**
+   * The same, for a fully portrait viewport — a phone.
+   *
+   * `settleY` sits high in the frame, which works on a landscape screen because
+   * the orb is wider than it is tall there and still reaches the bottom corners
+   * from up near the top. On a phone that leaves a band of uncovered page below
+   * the sphere, right where the composer is. `orbSettleY` interpolates between
+   * the two on aspect, so a desktop is untouched and a phone settles nearer the
+   * middle.
+   */
+  settleYPortrait: number;
   /** > 1 finishes the rise before the shrink finishes. Under 1 the orb is still
    *  climbing when it is already small enough to see past, and the swap shows. */
   riseBias: number;
@@ -129,6 +140,7 @@ export const ORB_TUNING_DEFAULTS: OrbTuning = {
   endRadius: 0.07,
   startBelow: 0.95,
   settleY: 0.28,
+  settleYPortrait: 0.4,
   riseBias: 1.5,
 
   swapFrom: 0.39,

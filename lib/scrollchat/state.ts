@@ -45,9 +45,9 @@ export const COMMIT_RATIO = 0.55;
 
 /**
  * Distance (px) from the document bottom at which the gesture ARMS. Arming is
- * NOT a gesture threshold — firing still requires `atBottom()` (gap <= 2px) and
- * the same dwell/commit rules as before. Arming only decides WHEN the feature is
- * allowed to be expensive:
+ * NOT a gesture threshold — firing still requires `atBottom()` (a gap inside
+ * `BOTTOM_EPSILON`) and the same dwell/commit rules as before. Arming only
+ * decides WHEN the feature is allowed to be expensive:
  *
  *  - the non-passive `wheel`/`touchmove` listeners attach only inside this
  *    window, so the rest of the site keeps Chrome's passive-scroll fast path;

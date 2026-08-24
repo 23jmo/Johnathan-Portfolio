@@ -5,6 +5,14 @@ import { useDialKit } from "dialkit";
 
 import RefractionFilter from "@/components/scrollchat/GlassRefractionFilter";
 import { glassTuning } from "@/lib/scrollchat/glassTuning";
+import {
+  flyToChip,
+  linearStep,
+  orbGeometryAt,
+  orbSizeUnit,
+  type ChipSlot,
+  type OrbGeometry,
+} from "@/lib/scrollchat/orbGeometry";
 
 /**
  * Scratch bench for the ORB REVEAL — a giant glass sphere that rises from below
@@ -23,103 +31,6 @@ import { glassTuning } from "@/lib/scrollchat/glassTuning";
  */
 
 type Dial = [value: number, min: number, max: number, step: number];
-
-const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-const easeInOutCubic = (t: number) =>
-  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
-/** Remap `value` from [inMin, inMax] onto 0..1, clamped at both ends. */
-function linearStep(value: number, inMin: number, inMax: number) {
-  if (inMax === inMin) return value >= inMax ? 1 : 0;
-  return Math.max(0, Math.min(1, (value - inMin) / (inMax - inMin)));
-}
-
-interface OrbGeometry {
-  centerX: number;
-  centerY: number;
-  radius: number;
-}
-
-/** The measured landing slot, in stage coordinates. */
-interface ChipSlot {
-  centerX: number;
-  centerY: number;
-  radius: number;
-}
-
-/**
- * Fold the fly phase into the settled geometry.
- *
- * Kept separate from `orbGeometryAt` because the two are driven by DIFFERENT
- * inputs and always have been: `progress` is the pull, which the visitor can
- * drag back and forth, and `fly` is the commit, which only ever runs forward
- * once the pull is released past the threshold. PageWarp already carries both as
- * separate MotionValues, so an orb that mixed them into one number could not be
- * wired to it without inventing a third.
- *
- * The path is a LOB rather than a straight line: the orb has to climb high
- * enough to cover the whole stage while the content swaps, and the chip lives
- * down in the composer, so a direct interpolation would either skip the cover or
- * approach the slot from above at an angle that reads as falling. Lifting the
- * midpoint keeps the arc reading as one continuous throw.
- */
-function flyToChip(
-  settled: OrbGeometry,
-  chip: ChipSlot,
-  fly: number,
-  lob: number
-): OrbGeometry {
-  const t = easeInOutCubic(Math.max(0, Math.min(1, fly)));
-  const arc = Math.sin(Math.PI * t) * lob;
-  return {
-    centerX: settled.centerX + (chip.centerX - settled.centerX) * t,
-    centerY:
-      settled.centerY + (chip.centerY - settled.centerY) * t - arc,
-    // Geometric again, for the same reason the shrink is: this leg spans
-    // another order of magnitude.
-    radius: settled.radius * Math.pow(chip.radius / settled.radius, t),
-  };
-}
-
-/**
- * Where the orb is at a given progress.
- *
- * The radius is interpolated GEOMETRICALLY (`r0 * (r1/r0)^t`) rather than
- * linearly, because it spans better than a factor of ten. A linear lerp across
- * that range spends most of its duration enormous and then collapses at the very
- * end; a geometric one shrinks at a constant RELATIVE rate, which is what reads
- * as a sphere receding rather than as a circle being deflated.
- */
-function orbGeometryAt(
-  progress: number,
-  viewport: { width: number; height: number },
-  shape: {
-    startRadius: number;
-    endRadius: number;
-    startBelow: number;
-    settleY: number;
-    riseBias: number;
-  }
-): OrbGeometry {
-  const startRadius = shape.startRadius * viewport.width;
-  const endRadius = shape.endRadius * viewport.width;
-
-  const shrink = easeInOutCubic(progress);
-  const radius = startRadius * Math.pow(endRadius / startRadius, shrink);
-
-  // The rise is deliberately front-loaded relative to the shrink: the orb has to
-  // be up over the content BEFORE it is small enough to see past, or the swap
-  // happens in plain sight.
-  const rise = easeOutCubic(Math.min(1, progress * shape.riseBias));
-  const startCenterY = viewport.height + startRadius * shape.startBelow;
-  const settleCenterY = shape.settleY * viewport.height;
-
-  return {
-    centerX: viewport.width / 2,
-    centerY: startCenterY + (settleCenterY - startCenterY) * rise,
-    radius,
-  };
-}
 
 /**
  * The blue caustic that pools along the lower inside of the rim while the orb is
@@ -330,15 +241,20 @@ export default function OrbDemoPage() {
   const readRef = useRef<Record<string, number>>({});
 
   const motion = useDialKit("Orb · motion", {
-    // Radii as fractions of the stage WIDTH, so the orb keeps its proportions on
-    // any screen. Start is deliberately > 1: the reference orb is wider than the
-    // phone, which is why only an arc of it is ever in frame at the beginning.
+    // Radii as fractions of the stage's aspect-normalised size unit (see
+    // `orbSizeUnit`), so the orb keeps its proportions on any screen — on a
+    // landscape stage that unit IS the width. Start is deliberately > 1: the
+    // reference orb is wider than the phone, which is why only an arc of it is
+    // ever in frame at the beginning.
     startRadius: [1.35, 0.6, 3, 0.05] as Dial,
     endRadius: [0.1, 0.03, 0.5, 0.005] as Dial,
     // How far below the bottom edge the centre starts, in start-radii.
     startBelow: [0.95, 0, 2, 0.05] as Dial,
-    // Where the settled bubble ends up, as a fraction of stage height.
+    // Where the settled bubble ends up, as a fraction of stage height. The
+    // portrait value is what a tall stage interpolates toward — see
+    // `orbSettleY`, which is why a phone-shaped frame settles lower.
     settleY: [0.3, 0, 1, 0.01] as Dial,
+    settleYPortrait: [0.4, 0, 1, 0.01] as Dial,
     // > 1 finishes the rise before the shrink finishes. Under 1 the orb is still
     // climbing when it is already small enough to see past, and the swap shows.
     riseBias: [1.7, 1, 4, 0.05] as Dial,
@@ -594,7 +510,8 @@ export default function OrbDemoPage() {
 
   // 0 at full size, 1 at the small end.
   const smallness =
-    1 - Math.min(1, geometry.radius / Math.max(1, viewport.width * 0.35));
+    1 -
+    Math.min(1, geometry.radius / Math.max(1, orbSizeUnit(viewport) * 0.35));
   const bodyMilk =
     surface.milk + (surface.milkSmall - surface.milk) * smallness;
 

@@ -13,9 +13,19 @@ import {
 
 import ChatFooter from "./ChatFooter";
 import { CHIP_DIAMETER, CHIP_CENTER_FROM_BOTTOM } from "@/lib/scrollchat/chip";
-import RefractionFilter from "./GlassRefractionFilter";
+import RefractionFilter, {
+  REFERENCE_CHROMATIC_SAMPLES,
+} from "./GlassRefractionFilter";
 import { useScrollChat } from "./ScrollChatProvider";
 import { useOrbTuning, type OrbTuning } from "@/lib/scrollchat/orbTuning";
+import {
+  flyToChip,
+  linearStep,
+  orbGeometryAt,
+  orbSizeUnit,
+  type ChipSlot,
+  type OrbGeometry,
+} from "@/lib/scrollchat/orbGeometry";
 
 /**
  * The scroll-to-chat transition: a giant glass orb rises from below the fold,
@@ -36,31 +46,11 @@ import { useOrbTuning, type OrbTuning } from "@/lib/scrollchat/orbTuning";
  *
  * The optics are not implemented here at all: `GlassRefractionFilter` is the
  * same graph, the same baked maps and the same `glassTuning` store the bench
- * uses. This file owns only WHERE the lens is and HOW BIG it is over time.
+ * uses. Nor is the trajectory: `lib/scrollchat/orbGeometry` owns where the lens
+ * is and how big it is over time, and the bench imports the same functions. What
+ * is left here is the wiring — measuring the page, holding it still, and
+ * deciding how much lens this particular device can afford.
  */
-
-const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-const easeInOutCubic = (t: number) =>
-  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
-/** Remap `value` from [inMin, inMax] onto 0..1, clamped at both ends. */
-function linearStep(value: number, inMin: number, inMax: number) {
-  if (inMax === inMin) return value >= inMax ? 1 : 0;
-  return Math.max(0, Math.min(1, (value - inMin) / (inMax - inMin)));
-}
-
-interface OrbGeometry {
-  centerX: number;
-  centerY: number;
-  radius: number;
-}
-
-/** The measured landing slot, in viewport coordinates. */
-interface ChipSlot {
-  centerX: number;
-  centerY: number;
-  radius: number;
-}
 
 /**
  * Everything measured once when the gesture engages.
@@ -73,77 +63,89 @@ interface ChipSlot {
  * a layout flush inside the frame loop to do it.
  */
 interface OrbStage {
-  /** Viewport, excluding the scrollbar — `clientWidth`, not `innerWidth`. */
+  /**
+   * The box the scene is painted into — `documentElement.clientWidth/Height`,
+   * NOT `window.innerWidth/Height`.
+   *
+   * The scene is `position: fixed; inset: 0`, which resolves against the layout
+   * viewport, and that is the box every number in here has to be expressed in.
+   * On a desktop the distinction is one scrollbar; on a phone `innerHeight` is
+   * the VISUAL viewport, which shrinks and grows by the height of the URL bar
+   * independently of the box the orb is actually being drawn in.
+   */
   width: number;
   height: number;
+  /** What the orb's radii are fractions of. See `orbSizeUnit`. */
+  sizeUnit: number;
   /** Document scroll at engage. The page is re-hung at `-scrollY` (see below). */
   scrollY: number;
   /** What the wrapper must be pinned to while the page is out of flow. */
   documentHeight: number;
   chip: ChipSlot;
+  /** How finely this device can afford to sample the spectrum. See `spectrumFor`. */
+  samples: number;
+  /** The matching scale on the channel-separation cap. See `spectrumFor`. */
+  chromaticMaxScale: number;
 }
 
 /**
- * Where the orb is at a given progress.
- *
- * The radius is interpolated GEOMETRICALLY (`r0 * (r1/r0)^t`) rather than
- * linearly, because it spans better than a factor of ten. A linear lerp across
- * that range spends most of its duration enormous and then collapses at the very
- * end; a geometric one shrinks at a constant RELATIVE rate, which is what reads
- * as a sphere receding rather than as a circle being deflated.
+ * The filter region the tuned tap count was chosen against: a ~1440x900 desktop
+ * viewport at device pixel ratio 1.
  */
-function orbGeometryAt(
-  progress: number,
-  viewport: { width: number; height: number },
-  tuning: OrbTuning
-): OrbGeometry {
-  const startRadius = tuning.startRadius * viewport.width;
-  const endRadius = tuning.endRadius * viewport.width;
+const REFERENCE_FILTER_PIXELS = 1440 * 900;
 
-  const shrink = easeInOutCubic(progress);
-  const radius = startRadius * Math.pow(endRadius / startRadius, shrink);
-
-  // The rise is deliberately front-loaded relative to the shrink: the orb has to
-  // be up over the content BEFORE it is small enough to see past, or the swap
-  // happens in plain sight.
-  const rise = easeOutCubic(Math.min(1, progress * tuning.riseBias));
-  const startCenterY = viewport.height + startRadius * tuning.startBelow;
-  const settleCenterY = tuning.settleY * viewport.height;
-
-  return {
-    centerX: viewport.width / 2,
-    centerY: startCenterY + (settleCenterY - startCenterY) * rise,
-    radius,
-  };
-}
+/** Below this the spectrum stops reading as one at all, so never go under it. */
+const MIN_CHROMATIC_SAMPLES = 3;
 
 /**
- * Fold the commit into the settled geometry.
+ * Ceiling on a touch device, however few pixels it turns out to have.
  *
- * Kept separate from `orbGeometryAt` because the two are driven by DIFFERENT
- * inputs: `progress` is the pull, which the visitor can drag back and forth, and
- * `fly` is the commit, which only ever runs forward once the pull is released
- * past the threshold.
- *
- * The path is a LOB rather than a straight line: the orb has to climb high
- * enough to cover the whole screen while the content swaps, and the chip lives
- * down in the composer, so a direct interpolation would either skip the cover or
- * approach the slot from above at an angle that reads as falling.
+ * The pixel budget below assumes the GPU behind those pixels is the reference
+ * one, and on a phone it is not — a small, cheap screen is usually attached to a
+ * small, cheap GPU, so a device that comes in UNDER the budget is not therefore
+ * able to spend it. The ceiling is what keeps the budget from handing a full
+ * desktop spectrum to a 360x800 handset that merely happens to have few pixels.
  */
-function flyToChip(
-  settled: OrbGeometry,
-  chip: ChipSlot,
-  fly: number,
-  lob: number
-): OrbGeometry {
-  const t = easeInOutCubic(Math.max(0, Math.min(1, fly)));
-  const arc = Math.sin(Math.PI * t) * lob;
+const MAX_COARSE_SAMPLES = 5;
+
+/**
+ * How finely to sample the spectrum on the device in front of us.
+ *
+ * Every wavelength tap is a full displacement pass over the whole filter region,
+ * so the graph's cost is (taps x region pixels) per frame — and the region is in
+ * DEVICE pixels, where a phone at DPR 3 carries two to three times a desktop's
+ * load on a fraction of its GPU. Eight taps over that is not a tuning choice,
+ * it is a slideshow.
+ *
+ * So hold the PRODUCT roughly constant instead of the tap count: sample as
+ * finely as the reference machine's budget allows on this many pixels. The cap
+ * on channel separation comes down with it, because the thing that makes a
+ * coarse spectrum read as separate ghosts rather than as a fringe is the gap
+ * between ADJACENT taps — `2 * spread / (samples - 1)` — and holding that
+ * constant is exactly what scaling the spread by `(samples - 1)` does.
+ *
+ * Applied only where the pointer is coarse. A 5K desktop carries the same pixel
+ * load and has a discrete GPU to carry it with, and its spectrum is the one that
+ * was signed off.
+ */
+function spectrumFor(width: number, height: number) {
+  const coarse =
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(pointer: coarse)").matches;
+  if (!coarse) return { samples: REFERENCE_CHROMATIC_SAMPLES, maxScale: 1 };
+
+  const dpr = window.devicePixelRatio || 1;
+  const pixels = Math.max(1, width * height * dpr * dpr);
+  const samples = Math.max(
+    MIN_CHROMATIC_SAMPLES,
+    Math.min(
+      MAX_COARSE_SAMPLES,
+      Math.round((REFERENCE_CHROMATIC_SAMPLES * REFERENCE_FILTER_PIXELS) / pixels)
+    )
+  );
   return {
-    centerX: settled.centerX + (chip.centerX - settled.centerX) * t,
-    centerY: settled.centerY + (chip.centerY - settled.centerY) * t - arc,
-    // Geometric again, for the same reason the shrink is: this leg spans another
-    // order of magnitude.
-    radius: settled.radius * Math.pow(chip.radius / settled.radius, t),
+    samples,
+    maxScale: (samples - 1) / (REFERENCE_CHROMATIC_SAMPLES - 1),
   };
 }
 
@@ -348,12 +350,29 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
     const chipElement =
       document.querySelector<HTMLElement>("[data-chat-chip]");
     const chipRect = chipElement?.getBoundingClientRect();
+    /*
+     * `clientWidth`/`clientHeight`, not `innerWidth`/`innerHeight`.
+     *
+     * The scene is `position: fixed; inset: 0`, so the box it paints into is
+     * the layout viewport — which is what `clientWidth`/`clientHeight` report
+     * and what `innerWidth`/`innerHeight` do not. On a desktop the width
+     * difference is the classic scrollbar, which stays on screen through the
+     * gesture and would otherwise push the orb half a scrollbar right of the
+     * content it is refracting. On a phone the HEIGHT difference is the URL
+     * bar: `innerHeight` is the visual viewport and shrinks as the toolbars
+     * come back, so the orb's start position, settle height and the
+     * `lensActive` test were all being computed against a box the scene is not
+     * drawn in.
+     */
+    const width = document.documentElement.clientWidth;
+    const height = document.documentElement.clientHeight;
+    const spectrum = spectrumFor(width, height);
     return {
-      // `clientWidth`, not `innerWidth`: the classic scrollbar stays on screen
-      // through the gesture, and an orb centred on `innerWidth / 2` would sit
-      // half a scrollbar to the right of the content it is refracting.
-      width: document.documentElement.clientWidth,
-      height: window.innerHeight,
+      width,
+      height,
+      sizeUnit: orbSizeUnit({ width, height }),
+      samples: spectrum.samples,
+      chromaticMaxScale: spectrum.maxScale,
       scrollY: window.scrollY,
       /*
        * NEVER SHRINK. The wrapper's own `offsetHeight` is what it contributes
@@ -383,8 +402,8 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
               radius: chipRect.width / 2,
             }
           : {
-              centerX: document.documentElement.clientWidth / 2,
-              centerY: window.innerHeight - CHIP_CENTER_FROM_BOTTOM,
+              centerX: width / 2,
+              centerY: height - CHIP_CENTER_FROM_BOTTOM,
               radius: CHIP_DIAMETER / 2,
             },
     };
@@ -465,11 +484,29 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
       if (!scheduled) scheduled = requestAnimationFrame(flush);
     };
 
-    // A resize mid-gesture would leave the lens, the crossfade and the landing
-    // slot all working from a viewport that no longer exists. Re-measuring is
-    // cheap and only ever happens while something is already on screen.
+    /*
+     * A resize mid-gesture would leave the lens, the crossfade and the landing
+     * slot all working from a viewport that no longer exists. Re-measuring is
+     * cheap and only ever happens while something is already on screen — and it
+     * is not rare on a phone, where a rotation or a returning URL bar resizes
+     * the layout viewport under a live gesture.
+     *
+     * `scrollY` and `documentHeight` are carried over rather than re-read.
+     * They describe the page as it was CAPTURED, and the page is out of flow by
+     * now: re-deriving them from a document mid-transition can only lose the
+     * position the visitor has to be handed back to.
+     */
     const onResize = () => {
-      if (engaged) setStage(measure());
+      if (!engaged) return;
+      setStage((previous) =>
+        previous
+          ? {
+              ...measure(),
+              scrollY: previous.scrollY,
+              documentHeight: previous.documentHeight,
+            }
+          : previous
+      );
     };
 
     const unsubProgress = progress.on("change", sync);
@@ -515,7 +552,7 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
 
   // 0 at full size, 1 at the small end.
   const smallness = stage
-    ? 1 - Math.min(1, geometry.radius / Math.max(1, stage.width * 0.35))
+    ? 1 - Math.min(1, geometry.radius / Math.max(1, stage.sizeUnit * 0.35))
     : 0;
   const bodyMilk = tuning.milk + (tuning.milkSmall - tuning.milk) * smallness;
 
@@ -689,7 +726,8 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
           radius={geometry.radius}
           box={{ width: stage.width, height: stage.height }}
           envelope={refractionEnvelope}
-          chromaticMaxPx={tuning.chromaticMaxPx}
+          samples={stage.samples}
+          chromaticMaxPx={tuning.chromaticMaxPx * stage.chromaticMaxScale}
           frost={tuning.frost}
           chromaticRimOnly={tuning.chromaticRimOnly}
         />

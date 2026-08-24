@@ -65,7 +65,11 @@ export default function ChatInput({
           rows={1}
           placeholder={placeholder}
           aria-label="Message"
-          className="max-h-[160px] flex-1 resize-none bg-transparent py-1 text-[15px] text-foreground placeholder:text-foreground/35 focus:outline-none"
+          // 16px below `sm`, not 15: iOS Safari ZOOMS the whole page when a
+          // field smaller than 16px takes focus, and there is no way back out
+          // of that zoom except a pinch — so tapping the composer would leave
+          // the visitor reading a chat that no longer fits the screen.
+          className="max-h-[160px] flex-1 resize-none bg-transparent py-1 text-base text-foreground placeholder:text-foreground/35 focus:outline-none sm:text-[15px]"
         />
         <button
           type="button"

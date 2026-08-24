@@ -34,7 +34,9 @@ export default function NameGate({ onSubmit }: { onSubmit: (name: string) => voi
           onChange={(e) => setName(e.target.value)}
           placeholder="Your name"
           aria-label="Your name"
-          className="w-full rounded-[26px] border border-foreground/12 bg-foreground/[0.05] px-5 py-3 text-center text-[15px] text-foreground transition-colors placeholder:text-foreground/35 focus:border-foreground/25 focus:outline-none"
+          // 16px below `sm` for the same reason the composer is: under 16px,
+          // iOS Safari zooms the page on focus and never zooms back.
+          className="w-full rounded-[26px] border border-foreground/12 bg-foreground/[0.05] px-5 py-3 text-center text-base text-foreground transition-colors placeholder:text-foreground/35 focus:border-foreground/25 focus:outline-none sm:text-[15px]"
         />
         <button
           type="submit"
