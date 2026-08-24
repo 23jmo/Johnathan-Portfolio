@@ -163,13 +163,29 @@ body.scrollchat-locked {
 
 /* Clean, calm near-black chat surface (Gemini-minimal). A single, very subtle
    top vignette gives it a touch of depth without competing with the glow. */
+/*
+ * The chat's backdrop is the PAGE's backdrop — same token, same dot grid, same
+ * size and phase.
+ *
+ * It used to be a near-black field, which was right when the page warped away
+ * into a circle: the two surfaces never sat side by side, so the contrast read
+ * as depth. The orb crossfades them in place instead, one dissolving straight
+ * through the other, and a light page turning near-black under a lens is the
+ * single most jarring thing in the transition. Matching them outright means the
+ * swap has nothing to give away but the words.
+ *
+ * It also puts the chat in the visitor's chosen theme rather than permanently
+ * inverted against it — the panel's own type is `foreground`-based for the same
+ * reason.
+ */
 .scrollchat-panel {
-  background-color: #0a0a0c;
-  background-image: radial-gradient(
-    120% 80% at 50% -10%,
-    rgba(120, 130, 160, 0.06),
-    transparent 60%
-  );
+  background-color: var(--background);
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.15) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.dark .scrollchat-panel {
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
 }
 
 /* The viewport-relative mask stays on a non-rotating frame: its elliptical

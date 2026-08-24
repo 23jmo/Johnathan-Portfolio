@@ -8,6 +8,7 @@ import SpotifyNowPlaying from "@/components/ui/SpotifyNowPlaying";
 import ScrollChatStage from "@/components/scrollchat/ScrollChatStage";
 import ScrollChatDials from "@/components/scrollchat/ScrollChatDials";
 import GlassDials from "@/components/scrollchat/GlassDials";
+import OrbDials from "@/components/scrollchat/OrbDials";
 import { Analytics } from "@vercel/analytics/next";
 import { Agentation } from "agentation";
 import { DialRoot } from "dialkit";
@@ -72,6 +73,7 @@ export default function RootLayout({
             <>
               <ScrollChatDials />
               <GlassDials />
+              <OrbDials />
               <DialRoot position="bottom-left" theme="dark" />
             </>
           )}

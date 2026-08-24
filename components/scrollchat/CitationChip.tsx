@@ -12,9 +12,9 @@ export default function CitationChip({ citation }: { citation: Citation }) {
       {...(citation.external
         ? { target: "_blank", rel: "noopener noreferrer" }
         : {})}
-      className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-xs text-white/70 transition-colors hover:border-white/30 hover:text-white"
+      className="inline-flex items-center gap-1 rounded-full border border-foreground/15 bg-foreground/5 px-2 py-0.5 text-xs text-foreground/70 transition-colors hover:border-foreground/30 hover:text-foreground"
     >
-      <span className="font-mono text-[10px] text-white/50">
+      <span className="font-mono text-[10px] text-foreground/50">
         [{citation.n}]
       </span>
       <span className="max-w-[14rem] truncate">{citation.label}</span>

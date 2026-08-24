@@ -54,7 +54,7 @@ export default function ChatInput({
 
   return (
     <div className="pb-5 pt-2">
-      <div className="flex items-end gap-2 rounded-[26px] border border-white/12 bg-white/[0.05] px-3 py-2.5 transition-colors focus-within:border-white/25">
+      <div className="flex items-end gap-2 rounded-[26px] border border-foreground/12 bg-foreground/[0.05] px-3 py-2.5 transition-colors focus-within:border-foreground/25">
         {/* Page-context chip — the warped page lands here as a leading tile. */}
         <ChatChip />
         <textarea
@@ -65,14 +65,14 @@ export default function ChatInput({
           rows={1}
           placeholder={placeholder}
           aria-label="Message"
-          className="max-h-[160px] flex-1 resize-none bg-transparent py-1 text-[15px] text-white placeholder:text-white/35 focus:outline-none"
+          className="max-h-[160px] flex-1 resize-none bg-transparent py-1 text-[15px] text-foreground placeholder:text-foreground/35 focus:outline-none"
         />
         <button
           type="button"
           onClick={submit}
           disabled={disabled || value.trim().length === 0}
           aria-label="Send message"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black transition-all hover:bg-white/90 disabled:bg-white/15 disabled:text-white/40"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-all hover:bg-foreground/90 disabled:bg-foreground/15 disabled:text-foreground/40"
         >
           <svg
             viewBox="0 0 24 24"

@@ -11,8 +11,34 @@ import {
 import { tuning } from "@/lib/scrollchat/tuning";
 import { ensureAudio, playArm, playDialTick } from "@/lib/scrollchat/audio";
 
-/** ms gap with no wheel/touch input before a pull counts as "released". */
-const RELEASE_MS = 110;
+/**
+ * ms gap with no wheel/touch input before a pull counts as "released".
+ *
+ * 110 was tuned against a trackpad, which emits a dense unbroken stream of
+ * `wheel` events for as long as fingers are on the glass — there, any gap that
+ * long really is a release. A MOUSE wheel does not stream: it fires a short
+ * burst per detent, and the gaps BETWEEN detents routinely exceed 110ms during
+ * a perfectly continuous scroll. Every one of those gaps read as a release, so
+ * the gesture was being torn down and sprung back mid-pull, several times, on
+ * the way down.
+ */
+const RELEASE_MS = 260;
+
+/**
+ * How long a released-but-uncommitted pull HOLDS before it springs back.
+ *
+ * Releasing straight into the spring makes the transition punish hesitation:
+ * the moment the visitor's hand pauses, everything they pulled up is taken
+ * away, and picking it back up starts from zero. The hold gives the gesture a
+ * beat of patience — the orb rests where it was left, and a scroll that
+ * resumes inside the window continues from the same budget instead of
+ * restarting the climb.
+ *
+ * Deliberately shorter than it feels: `progress` is still live through the
+ * hold, so the page stays scroll-locked for its whole length, and anything
+ * longer starts reading as the page having seized up.
+ */
+const HOLD_MS = 420;
 
 /**
  * Detects an overscroll-past-bottom gesture and feeds it into `progress`.
@@ -50,6 +76,11 @@ export default function OverscrollController() {
   const pulling = useRef(false);
   const springRef = useRef<ReturnType<typeof animate> | null>(null);
   const releaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Runs while a released-but-uncommitted pull is resting at its reached
+  // progress, before `collapsePull` springs it away. Non-null ONLY during that
+  // window, which is also how `beginPull` knows a resumed scroll should inherit
+  // the standing budget rather than start a new climb.
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTickStep = useRef(-1);
   // One-shot "armed" accent (crossed the commit ratio — release now = commit).
   const armAccentFired = useRef(false);
@@ -147,6 +178,12 @@ export default function OverscrollController() {
 
     const beginPull = () => {
       stopSpring();
+      // Cancel any pending collapse: this is the resumed scroll the hold exists
+      // for, and the budget it is about to add to is the one the hold preserved.
+      if (holdTimer.current) {
+        clearTimeout(holdTimer.current);
+        holdTimer.current = null;
+      }
       pulling.current = true;
     };
 
@@ -155,21 +192,23 @@ export default function OverscrollController() {
       releaseTimer.current = setTimeout(endPull, RELEASE_MS);
     };
 
-    const endPull = () => {
-      if (!pulling.current) return;
-      pulling.current = false;
-      const ratio = Math.min(1, budget.current / tuning.gestureThreshold);
+    /**
+     * Give back the budget and flatten the page.
+     *
+     * Split out of `endPull` because the two are no longer the same moment: a
+     * pull that ends below the commit line first HOLDS, and only this half runs
+     * when the hold expires. Zeroing the budget is what makes the collapse
+     * irreversible, so it must not happen at release — a scroll that resumes
+     * during the hold has to find its budget still there, or the orb drops to
+     * nothing and climbs again from the bottom.
+     */
+    const collapsePull = () => {
+      holdTimer.current = null;
       budget.current = 0;
       lastTickStep.current = -1;
       armAccentFired.current = false;
       momentumOnly.current = false;
 
-      if (ratio >= tuning.commitRatio) {
-        if (!reducedMotion) vibrate([12, 8, 20]);
-        open(); // provider springs progress → 1, phase warping → chat
-        return;
-      }
-      // Below the line: spring back to a flat page.
       if (reducedMotion) {
         progress.set(0);
         return;
@@ -180,6 +219,39 @@ export default function OverscrollController() {
           springRef.current = null;
         },
       });
+    };
+
+    /**
+     * `immediate` skips the hold. Used for a finger LIFT, which is an
+     * unambiguous "no" — nothing is waiting to be resumed, and holding a
+     * half-risen orb after the hand has left the screen reads as a hang rather
+     * than as patience. Input silence, which is the wheel's only release
+     * signal, cannot tell a decision from a pause and so always holds.
+     */
+    const endPull = (immediate = false) => {
+      if (!pulling.current) return;
+      pulling.current = false;
+      const ratio = Math.min(1, budget.current / tuning.gestureThreshold);
+
+      if (ratio >= tuning.commitRatio) {
+        budget.current = 0;
+        lastTickStep.current = -1;
+        armAccentFired.current = false;
+        momentumOnly.current = false;
+        if (!reducedMotion) vibrate([12, 8, 20]);
+        open(); // provider springs progress → 1, phase warping → chat
+        return;
+      }
+
+      if (immediate || reducedMotion) {
+        collapsePull();
+        return;
+      }
+      // Below the line: rest here for a beat, then flatten. `progress` is left
+      // exactly where the pull left it — no animation at all — so the orb holds
+      // its position rather than easing anywhere.
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+      holdTimer.current = setTimeout(collapsePull, HOLD_MS);
     };
 
     const applyDelta = (delta: number) => {
@@ -211,6 +283,16 @@ export default function OverscrollController() {
           budget.current = Math.max(0, budget.current + e.deltaY);
           setFromBudget();
           scheduleRelease();
+          return;
+        }
+        // Scrolling up during the HOLD is the visitor leaving. Collapse now
+        // rather than letting the hold run out on its own: the page is pinned
+        // for as long as `progress` is up, so a scroll that lands while it is
+        // still held moves the document without moving anything on screen — and
+        // is then undone when the transition hands the scroll position back.
+        if (holdTimer.current) {
+          clearTimeout(holdTimer.current);
+          collapsePull();
         }
         return;
       }
@@ -272,7 +354,7 @@ export default function OverscrollController() {
       lastTouchY.current = null;
       if (pulling.current) {
         if (releaseTimer.current) clearTimeout(releaseTimer.current);
-        endPull();
+        endPull(true);
       }
     };
 
@@ -347,6 +429,9 @@ export default function OverscrollController() {
       window.removeEventListener("scroll", trackBottom);
       window.removeEventListener("resize", trackBottom);
       if (releaseTimer.current) clearTimeout(releaseTimer.current);
+      // A pending hold outlives this effect otherwise, and fires `collapsePull`
+      // against a `progress` the next mount is already driving.
+      if (holdTimer.current) clearTimeout(holdTimer.current);
       stopSpring();
       armed.set(0);
     };

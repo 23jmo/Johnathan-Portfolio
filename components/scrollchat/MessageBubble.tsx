@@ -44,12 +44,12 @@ export default function MessageBubble({ message }: { message: ChatMessage }) {
         <div
           className={
             isUser
-              ? "self-end rounded-2xl rounded-br-md bg-white/[0.08] px-3.5 py-2 text-[15px] leading-relaxed text-white/95"
-              : "text-[15px] leading-relaxed text-white/90"
+              ? "self-end rounded-2xl rounded-br-md bg-foreground/[0.08] px-3.5 py-2 text-[15px] leading-relaxed text-foreground/95"
+              : "text-[15px] leading-relaxed text-foreground/90"
           }
         >
           {message.content ? (
-            <div className="[&_a]:text-white/80">
+            <div className="[&_a]:text-foreground/80">
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={chatMarkdown}>
                 {message.content}
               </ReactMarkdown>
@@ -75,7 +75,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }) {
             {message.youtube.map((video) => (
               <div
                 key={video.videoId}
-                className="overflow-hidden rounded-xl border border-white/10 bg-black"
+                className="overflow-hidden rounded-xl border border-foreground/10 bg-black"
               >
                 <div className="relative aspect-video">
                   <iframe
@@ -87,7 +87,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }) {
                   />
                 </div>
                 {video.title && (
-                  <p className="px-3 py-2 text-xs text-white/70">{video.title}</p>
+                  <p className="px-3 py-2 text-xs text-foreground/70">{video.title}</p>
                 )}
               </div>
             ))}

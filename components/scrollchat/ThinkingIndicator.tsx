@@ -68,7 +68,7 @@ export default function ThinkingIndicator({
   const glyph = prefersReducedMotion ? "⠿" : BRAILLE_FRAMES[frameIndex];
 
   return (
-    <div className="flex items-center gap-2.5 text-[15px] leading-relaxed text-white/45">
+    <div className="flex items-center gap-2.5 text-[15px] leading-relaxed text-foreground/45">
       {/*
         aria-hidden is load-bearing, not cosmetic: this sits inside the message
         list's aria-live="polite" region, and a glyph changing ~12x a second
@@ -77,7 +77,7 @@ export default function ThinkingIndicator({
       */}
       <span
         aria-hidden="true"
-        className="w-[1ch] shrink-0 font-mono text-base tabular-nums text-white/70"
+        className="w-[1ch] shrink-0 font-mono text-base tabular-nums text-foreground/70"
       >
         {glyph}
       </span>
