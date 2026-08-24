@@ -9,6 +9,7 @@ import {
   REARM_COOLDOWN,
 } from "@/lib/scrollchat/state";
 import { tuning } from "@/lib/scrollchat/tuning";
+import { isScrubHeld } from "@/lib/scrollchat/scrub";
 import { ensureAudio, playArm, playDialTick } from "@/lib/scrollchat/audio";
 
 /**
@@ -272,6 +273,10 @@ export default function OverscrollController() {
     };
 
     const onWheel = (e: WheelEvent) => {
+      // The dev scrubber owns `progress`/`fly` while a frame is held. Bailing
+      // here (rather than letting the pull run and lose the race) is what keeps
+      // a stray wheel event from yanking a frame out from under the dials.
+      if (isScrubHeld()) return;
       const sinceLastWheel = performance.now() - lastWheelAt.current;
       lastWheelAt.current = performance.now();
 
@@ -317,6 +322,10 @@ export default function OverscrollController() {
     };
 
     const onTouchMove = (e: TouchEvent) => {
+      // The dev scrubber owns `progress`/`fly` while a frame is held. Bailing
+      // here (rather than letting the pull run and lose the race) is what keeps
+      // a stray wheel event from yanking a frame out from under the dials.
+      if (isScrubHeld()) return;
       const y = e.touches[0]?.clientY ?? null;
       if (y === null) return;
       if (lastTouchY.current === null) {

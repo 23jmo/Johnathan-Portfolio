@@ -9,6 +9,7 @@ import ScrollChatStage from "@/components/scrollchat/ScrollChatStage";
 import ScrollChatDials from "@/components/scrollchat/ScrollChatDials";
 import GlassDials from "@/components/scrollchat/GlassDials";
 import OrbDials from "@/components/scrollchat/OrbDials";
+import OrbScrubber from "@/components/scrollchat/OrbScrubber";
 import { Analytics } from "@vercel/analytics/next";
 import { Agentation } from "agentation";
 import { DialRoot } from "dialkit";
@@ -74,6 +75,7 @@ export default function RootLayout({
               <ScrollChatDials />
               <GlassDials />
               <OrbDials />
+              <OrbScrubber />
               <DialRoot position="bottom-left" theme="dark" />
             </>
           )}

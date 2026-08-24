@@ -125,22 +125,22 @@ export interface OrbTuning {
 }
 
 export const ORB_TUNING_DEFAULTS: OrbTuning = {
-  startRadius: 1.35,
-  endRadius: 0.1,
+  startRadius: 0.85,
+  endRadius: 0.07,
   startBelow: 0.95,
-  settleY: 0.3,
-  riseBias: 1.7,
+  settleY: 0.28,
+  riseBias: 1.5,
 
   swapFrom: 0.39,
   swapTo: 0.51,
 
-  causticFadeBy: 0.37,
-  causticStrength: 0.43,
-  causticBand: 0.84,
-  causticWidth: 0.23,
-  causticDrop: 0.28,
-  causticSoftness: 0.075,
-  causticHue: 303,
+  causticFadeBy: 0.59,
+  causticStrength: 0.62,
+  causticBand: 0.68,
+  causticWidth: 0.08,
+  causticDrop: 0.19,
+  causticSoftness: 0.125,
+  causticHue: 192,
 
   lob: 0.08,
   dissolveFrom: 0.62,
@@ -149,12 +149,12 @@ export const ORB_TUNING_DEFAULTS: OrbTuning = {
   milk: 0,
   milkSmall: 0,
   shadow: 0.23,
-  chromaticMaxPx: 24,
+  chromaticMaxPx: 21,
   frost: 0,
   chromaticRimOnly: 1,
 
-  refraction: 2.15,
-  smallBoost: 0,
+  refraction: 2.05,
+  smallBoost: 0.25,
 };
 
 /**
