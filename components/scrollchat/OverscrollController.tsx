@@ -363,7 +363,14 @@ export default function OverscrollController() {
       lastTouchY.current = null;
       if (pulling.current) {
         if (releaseTimer.current) clearTimeout(releaseTimer.current);
-        endPull(true);
+        // NOT `endPull(true)`. A lifted finger reads as an unambiguous "no" on a
+        // trackpad, where you can keep scrolling without ever letting go — but a
+        // lift is how a phone takes its SECOND swipe. Collapsing immediately
+        // made a multi-swipe pull impossible: every lift dumped the whole
+        // budget, so the orb could only ever climb as far as one thumb-length
+        // got it. Falling through to the same HOLD_MS patience the wheel gets
+        // lets a resumed swipe inherit the standing budget.
+        endPull();
       }
     };
 

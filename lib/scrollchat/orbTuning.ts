@@ -24,8 +24,11 @@ import { useSyncExternalStore } from "react";
  * read returns the default — so the store half is inert outside development.
  */
 export interface OrbTuning {
-  /* --- Motion. Radii are fractions of the viewport WIDTH. --- */
-  /** Deliberately > 1: the orb is wider than the screen, so only an arc of it
+  /* --- Motion. Radii are fractions of the viewport's LONGEST EDGE, which is
+     the width on any landscape screen and the height in portrait. Scaling off
+     width alone sized a phone's orb to 0.78x the screen height, so it never
+     covered the crossfade. --- */
+  /** Deliberately > 1: the orb is larger than the screen, so only an arc of it
    *  is ever in frame at the start. */
   startRadius: number;
   endRadius: number;

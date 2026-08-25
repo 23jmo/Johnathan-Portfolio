@@ -97,8 +97,20 @@ function orbGeometryAt(
   viewport: { width: number; height: number },
   tuning: OrbTuning
 ): OrbGeometry {
-  const startRadius = tuning.startRadius * viewport.width;
-  const endRadius = tuning.endRadius * viewport.width;
+  // The radii scale off the LONGEST viewport edge, not the width.
+  //
+  // Whether the orb hides the crossfade is a question about the viewport's
+  // DIAGONAL, and width alone only tracks that on a landscape screen. Scaling
+  // off width put a phone's orb at 1.7x the screen's width but 0.78x its
+  // height — wider than the display and still leaving the page visible above
+  // and below it, so the swap happened in plain sight in the gaps.
+  //
+  // `max` rather than the diagonal itself because on ANY landscape viewport
+  // `max === width`, so every desktop keeps the exact geometry these numbers
+  // were tuned against; only portrait changes behaviour.
+  const longestEdge = Math.max(viewport.width, viewport.height);
+  const startRadius = tuning.startRadius * longestEdge;
+  const endRadius = tuning.endRadius * longestEdge;
 
   const shrink = easeInOutCubic(progress);
   const radius = startRadius * Math.pow(endRadius / startRadius, shrink);
@@ -468,7 +480,19 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
     // A resize mid-gesture would leave the lens, the crossfade and the landing
     // slot all working from a viewport that no longer exists. Re-measuring is
     // cheap and only ever happens while something is already on screen.
+    //
+    // WIDTH-ONLY, because `window.innerHeight` is not a constant on mobile: the
+    // URL bar collapses as you scroll, and scrolling to the bottom is exactly
+    // what triggers the gesture. Re-measuring on those fires repeatedly through
+    // the bar's animation, and each one re-reads `scrollY` and re-hangs the page
+    // at a new offset — the page and the orb visibly jolt on every pull. An
+    // orientation change or a desktop window resize moves the width too, so the
+    // cases that genuinely invalidate the stage are still caught.
+    let lastWidth = document.documentElement.clientWidth;
     const onResize = () => {
+      const width = document.documentElement.clientWidth;
+      if (width === lastWidth) return;
+      lastWidth = width;
       if (engaged) setStage(measure());
     };
 
