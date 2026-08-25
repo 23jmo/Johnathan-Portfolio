@@ -24,10 +24,14 @@ import { useSyncExternalStore } from "react";
  * read returns the default — so the store half is inert outside development.
  */
 export interface OrbTuning {
-  /* --- Motion. Radii are fractions of the viewport's LONGEST EDGE, which is
-     the width on any landscape screen and the height in portrait. Scaling off
-     width alone sized a phone's orb to 0.78x the screen height, so it never
-     covered the crossfade. --- */
+  /* --- Motion. Radii are fractions of the distance from the settled centre to
+     the FARTHEST VIEWPORT CORNER (`coverRadius` in `OrbWarp`), so `radius /
+     coverRadius` — the share of the screen hidden behind glass — is the same on
+     a laptop and a phone. Every edge-based base fails in portrait: `width`
+     sized a phone's orb to 0.78x the screen height, and `max(width, height)`
+     still left it stopping two thirds down. Rescaled from the width-based
+     numbers by 1.5541, the ratio on a 16:9 window, so landscape is unchanged
+     from the values the look was signed off at. --- */
   /** Deliberately > 1: the orb is larger than the screen, so only an arc of it
    *  is ever in frame at the start. */
   startRadius: number;
@@ -128,8 +132,8 @@ export interface OrbTuning {
 }
 
 export const ORB_TUNING_DEFAULTS: OrbTuning = {
-  startRadius: 0.85,
-  endRadius: 0.07,
+  startRadius: 1.321,
+  endRadius: 0.1088,
   startBelow: 0.95,
   settleY: 0.28,
   riseBias: 1.5,

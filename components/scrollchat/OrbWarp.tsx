@@ -97,20 +97,31 @@ function orbGeometryAt(
   viewport: { width: number; height: number },
   tuning: OrbTuning
 ): OrbGeometry {
-  // The radii scale off the LONGEST viewport edge, not the width.
+  const settleCenterY = tuning.settleY * viewport.height;
+
+  // The radii are fractions of the distance from the SETTLED CENTRE TO THE
+  // FARTHEST VIEWPORT CORNER — not of any edge.
   //
-  // Whether the orb hides the crossfade is a question about the viewport's
-  // DIAGONAL, and width alone only tracks that on a landscape screen. Scaling
-  // off width put a phone's orb at 1.7x the screen's width but 0.78x its
-  // height — wider than the display and still leaving the page visible above
-  // and below it, so the swap happened in plain sight in the gaps.
+  // What the transition actually needs from the orb is that it hides the
+  // crossfade, and whether it does is a question about corners: the disc covers
+  // the screen exactly when its radius reaches the farthest one. Every
+  // edge-derived base answers a different question, and answers it differently
+  // per aspect ratio.
   //
-  // `max` rather than the diagonal itself because on ANY landscape viewport
-  // `max === width`, so every desktop keeps the exact geometry these numbers
-  // were tuned against; only portrait changes behaviour.
-  const longestEdge = Math.max(viewport.width, viewport.height);
-  const startRadius = tuning.startRadius * longestEdge;
-  const endRadius = tuning.endRadius * longestEdge;
+  // Scaling off `width` sized a phone's orb to 0.78x the screen height. Scaling
+  // off `max(width, height)` fixed the framing but not the coverage: on a
+  // 402x745 phone the long edge is 745 while the far corner is only 572 away,
+  // so a radius calibrated on a laptop still stopped two thirds down the screen
+  // and the page showed plainly underneath during the swap. Measuring to the
+  // corner makes `radius / coverRadius` — how much of the screen is behind
+  // glass — identical on every display, which is the property that was
+  // silently assumed all along.
+  const coverRadius = Math.hypot(
+    viewport.width / 2,
+    Math.max(settleCenterY, viewport.height - settleCenterY)
+  );
+  const startRadius = tuning.startRadius * coverRadius;
+  const endRadius = tuning.endRadius * coverRadius;
 
   const shrink = easeInOutCubic(progress);
   const radius = startRadius * Math.pow(endRadius / startRadius, shrink);
@@ -120,7 +131,6 @@ function orbGeometryAt(
   // happens in plain sight.
   const rise = easeOutCubic(Math.min(1, progress * tuning.riseBias));
   const startCenterY = viewport.height + startRadius * tuning.startBelow;
-  const settleCenterY = tuning.settleY * viewport.height;
 
   return {
     centerX: viewport.width / 2,
