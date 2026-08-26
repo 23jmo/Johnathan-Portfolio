@@ -113,9 +113,18 @@ export default function OverscrollController() {
   }, [phase]);
 
   useEffect(() => {
+    /*
+     * `clientHeight`, not `innerHeight`. The browser clamps scrolling so that
+     * `scrollY_max === scrollHeight - clientHeight`, so those three are the
+     * identity this gate is testing and they must all be LAYOUT-viewport
+     * quantities. `innerHeight` is the VISUAL viewport on mobile: it shrinks
+     * under the URL bar and under pinch-zoom, leaving a gap of tens of pixels
+     * at a scroll position the browser considers the bottom — so `atBottom()`
+     * never became true and the gesture simply refused to arm on a phone.
+     */
     const docBottomGap = () =>
       document.documentElement.scrollHeight -
-      (window.innerHeight + window.scrollY);
+      (document.documentElement.clientHeight + window.scrollY);
 
     const atBottom = () => docBottomGap() <= 2;
 

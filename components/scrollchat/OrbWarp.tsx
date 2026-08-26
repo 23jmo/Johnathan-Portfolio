@@ -342,6 +342,7 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
   const tuning = useOrbTuning();
 
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const viewportProbeRef = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<OrbStage | null>(null);
   const [frame, setFrame] = useState({ progress: 0, fly: 0 });
 
@@ -370,12 +371,32 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
     const chipElement =
       document.querySelector<HTMLElement>("[data-chat-chip]");
     const chipRect = chipElement?.getBoundingClientRect();
+    /*
+     * MEASURED, not guessed. Both things that have to agree about where the orb
+     * is — the `fixed` overlay that paints the disc, and the filter region,
+     * declared `userSpaceOnUse` from (0,0) — resolve against the SAME box: the
+     * containing block for `position: fixed`. No `window` property is reliably
+     * that box.
+     *
+     * This used to take `clientWidth` for the width (right: the classic
+     * scrollbar stays on screen, and an orb centred on `innerWidth / 2` sits
+     * half a scrollbar off) and `innerHeight` for the height — two different
+     * viewports. They agree on a desktop, so it read as one. On iOS Safari
+     * `innerHeight` is the VISUAL viewport, shrinking as the URL bar shows,
+     * while `fixed` still lays out against the LAYOUT viewport: the disc landed
+     * in one box and the filter region described another, which is what a
+     * refraction that has drifted off its own orb actually is.
+     *
+     * A hidden `inset: 0` probe is the containing block by construction, on
+     * every browser, with no assumption about which viewport is which.
+     */
+    const probeRect = viewportProbeRef.current?.getBoundingClientRect();
+    const viewportWidth = probeRect?.width || document.documentElement.clientWidth;
+    const viewportHeight =
+      probeRect?.height || document.documentElement.clientHeight;
     return {
-      // `clientWidth`, not `innerWidth`: the classic scrollbar stays on screen
-      // through the gesture, and an orb centred on `innerWidth / 2` would sit
-      // half a scrollbar to the right of the content it is refracting.
-      width: document.documentElement.clientWidth,
-      height: window.innerHeight,
+      width: viewportWidth,
+      height: viewportHeight,
       scrollY: window.scrollY,
       /*
        * NEVER SHRINK. The wrapper's own `offsetHeight` is what it contributes
@@ -405,8 +426,8 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
               radius: chipRect.width / 2,
             }
           : {
-              centerX: document.documentElement.clientWidth / 2,
-              centerY: window.innerHeight - CHIP_CENTER_FROM_BOTTOM,
+              centerX: viewportWidth / 2,
+              centerY: viewportHeight - CHIP_CENTER_FROM_BOTTOM,
               radius: CHIP_DIAMETER / 2,
             },
     };
@@ -592,6 +613,22 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
          */
         style={stage ? { height: stage.documentHeight } : undefined}
       >
+        {/* The ruler for `measure()`. Rendered unconditionally and never
+            filtered, so it resolves against the same containing block the disc
+            overlay and the filter region do. `visibility: hidden` still lays
+            out; `display: none` would not. */}
+        <div
+          ref={viewportProbeRef}
+          aria-hidden
+          data-orb-viewport-probe
+          style={{
+            position: "fixed",
+            inset: 0,
+            visibility: "hidden",
+            pointerEvents: "none",
+            zIndex: -1,
+          }}
+        />
         <div
           data-orb-scene
           /*
