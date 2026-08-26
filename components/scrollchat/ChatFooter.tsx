@@ -1,11 +1,55 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useTransform } from "framer-motion";
 import { useScrollChat } from "./ScrollChatProvider";
 import MessageList from "./MessageList";
 import ChatInput from "./ChatInput";
 import NameGate from "./NameGate";
+
+/**
+ * How much of the panel the software keyboard is currently covering, in px.
+ *
+ * A `position: fixed` box is laid out against the LAYOUT viewport, and the
+ * on-screen keyboard does not shrink that — so on a phone the composer sits
+ * underneath the keyboard from the moment it opens, which is the only moment it
+ * matters. The VISUAL viewport does shrink, and the difference between the two
+ * is exactly the covered strip.
+ *
+ * The threshold is what keeps this from firing on anything else: a mobile URL
+ * bar sliding back in moves the same two numbers apart by a few dozen pixels,
+ * and reacting to that would make the panel twitch every time the page settles.
+ * No keyboard is that short.
+ */
+const KEYBOARD_MIN_PX = 120;
+
+function useKeyboardInset() {
+  const [inset, setInset] = useState(0);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const sync = () => {
+      const covered =
+        document.documentElement.clientHeight -
+        (viewport.height + viewport.offsetTop);
+      setInset(covered >= KEYBOARD_MIN_PX ? Math.round(covered) : 0);
+    };
+
+    sync();
+    // `scroll` as well as `resize`: the visual viewport also PANS when the
+    // keyboard opens over a focused field, and only its offset moves then.
+    viewport.addEventListener("resize", sync);
+    viewport.addEventListener("scroll", sync);
+    return () => {
+      viewport.removeEventListener("resize", sync);
+      viewport.removeEventListener("scroll", sync);
+    };
+  }, []);
+
+  return inset;
+}
 
 /**
  * The AI chat — a STATIONARY full-screen layer that lives *behind* the page. It
@@ -35,6 +79,7 @@ export default function ChatFooter() {
 
   const panelRef = useRef<HTMLDivElement>(null);
   const open = phase === "chat";
+  const keyboardInset = useKeyboardInset();
 
   // NO opacity ramp of its own any more. This used to dissolve in over
   // [0, COMMIT_RATIO], which was the right curve when the page warped into a
@@ -151,8 +196,13 @@ export default function ChatFooter() {
         </svg>
       </button>
 
-      {/* Body — centered measure */}
-      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden px-4">
+      {/* Body — centered measure. The keyboard inset is padding rather than a
+          height, so the message list (which is the flex child that grows) gives
+          up the space and the composer rides above the keyboard. */}
+      <div
+        style={keyboardInset ? { paddingBottom: keyboardInset } : undefined}
+        className="relative z-10 mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden px-4"
+      >
         {needsName ? (
           <NameGate onSubmit={setUserName} />
         ) : isEmpty ? (

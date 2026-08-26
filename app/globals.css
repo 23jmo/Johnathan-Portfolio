@@ -137,6 +137,14 @@ html {
   /* Reserve the scrollbar gutter so pinning the body (chat scroll-lock) doesn't
      reflow the page sideways when the scrollbar disappears. */
   scrollbar-gutter: stable;
+  /* The scroll-to-chat gesture IS an overscroll past the bottom, and a phone's
+     native bounce is the browser answering the same finger movement with an
+     animation of its own — the page rubber-bands while the orb rises, and on
+     iOS a touchmove the scroller has already claimed cannot be preventDefault'd
+     back. Turning the bounce off leaves the gesture as the only thing reading
+     that drag. It also disables pull-to-refresh at the top, which this site has
+     no use for. */
+  overscroll-behavior-y: none;
 }
 
 /* Scroll-to-AI-chat: body scroll is locked while the chat footer is engaged. */
