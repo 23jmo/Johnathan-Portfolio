@@ -209,7 +209,7 @@ export const socialLinks: SocialLink[] = [
 
 export const youtubeChannel = "https://www.youtube.com/@jmooooooooo";
 
-export const ctaLink = "https://booking.akiflow.com/johnathan-m-0da1";
+export const ctaLink = "mailto:2023johnathanmo@gmail.com";
 
 export const hackathons: Hackathon[] = [
   {

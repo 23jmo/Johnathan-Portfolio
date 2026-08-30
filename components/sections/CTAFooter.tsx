@@ -9,8 +9,6 @@ export default function CTAFooter() {
           Want to say hi? Want to sponsor a video? Need a dev for your company?{" "}
           <a
             href={ctaLink}
-            target="_blank"
-            rel="noopener noreferrer"
             className="text-accent hover:underline underline-offset-2"
           >
             Let&apos;s chat &rarr;

@@ -50,7 +50,7 @@ function buildSources(): Record<string, Source> {
   socialLinks.forEach((s) => add(`social-${slug(s.name)}`, s.name, s.url));
 
   add("youtube", "Johnathan's YouTube", youtubeChannel);
-  add("booking", "Book time with Johnathan", ctaLink);
+  add("booking", "Email Johnathan", ctaLink);
   add("site", "johnathanmo.com", "/");
 
   return map;
