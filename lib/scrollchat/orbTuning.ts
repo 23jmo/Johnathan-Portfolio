@@ -136,15 +136,15 @@ export interface OrbTuning {
 }
 
 export const ORB_TUNING_DEFAULTS: OrbTuning = {
-  startRadius: 0.85,
+  startRadius: 0.7,
   endRadius: 0.07,
   startBelow: 0.95,
   settleY: 0.28,
   settleYPortrait: 0.4,
   riseBias: 1.5,
 
-  swapFrom: 0.39,
-  swapTo: 0.51,
+  swapFrom: 0.26,
+  swapTo: 0.35,
 
   causticFadeBy: 0.59,
   causticStrength: 0.62,
@@ -160,12 +160,12 @@ export const ORB_TUNING_DEFAULTS: OrbTuning = {
 
   milk: 0,
   milkSmall: 0,
-  shadow: 0.23,
+  shadow: 0.34,
   chromaticMaxPx: 21,
   frost: 0,
   chromaticRimOnly: 1,
 
-  refraction: 2.05,
+  refraction: 0.9,
   smallBoost: 0.25,
 };
 

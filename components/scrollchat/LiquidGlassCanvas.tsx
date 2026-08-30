@@ -52,13 +52,13 @@ type ElementImageGl = WebGL2RenderingContext & {
   ) => void;
 };
 
-const VERTEX_SHADER = `#version 300 es
+export const VERTEX_SHADER = `#version 300 es
 in vec2 position;
 void main() {
   gl_Position = vec4(position, 0.0, 1.0);
 }`;
 
-const FRAGMENT_SHADER = `#version 300 es
+export const FRAGMENT_SHADER = `#version 300 es
 precision highp float;
 out vec4 fragColor;
 

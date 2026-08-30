@@ -4,7 +4,7 @@ import type { PageContext } from "@/types";
 export type ScrollChatPhase = "idle" | "warping" | "chat" | "reversing";
 
 /** Wheel/touch budget (in px) required to fully arm the gesture. */
-export const GESTURE_THRESHOLD = 1000;
+export const GESTURE_THRESHOLD = 2175;
 
 /**
  * A pull is DELIBERATE (full strength) only if it begins after this much wheel
@@ -41,7 +41,7 @@ export const MOMENTUM_ATTENUATION = 0.2;
 export const MOMENTUM_PROGRESS_CAP = 0.4;
 
 /** Fraction of the threshold at which releasing commits into the chat. */
-export const COMMIT_RATIO = 0.55;
+export const COMMIT_RATIO = 0.98;
 
 /**
  * Distance (px) from the document bottom at which the gesture ARMS. Arming is

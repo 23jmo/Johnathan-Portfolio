@@ -4,7 +4,9 @@ import { type ReactNode } from "react";
 import ScrollChatProvider, { useScrollChat } from "./ScrollChatProvider";
 import OverscrollController from "./OverscrollController";
 import OrbWarp from "./OrbWarp";
+import { PageTextureProvider } from "./PageTextureProvider";
 import ScreenGlow from "./ScreenGlow";
+import { TextureWarmIndicator } from "./TextureWarmIndicator";
 
 /** Always-available, keyboard-reachable entry point (a11y: not gated behind a gesture). */
 function AskButton() {
@@ -34,9 +36,17 @@ function AskButton() {
 export default function ScrollChatStage({ children }: { children: ReactNode }) {
   return (
     <ScrollChatProvider>
-      {/* OrbWarp wraps the page AND renders ChatFooter (the stationary chat
-          backdrop that lives behind the page) inside its wrapper. */}
-      <OrbWarp>{children}</OrbWarp>
+      {/* Photographs the viewport so the orb can refract it in WebGL. Scoped to
+          here rather than the root layout because nothing outside this subtree
+          has any use for it, and it must sit ABOVE OrbWarp so the capture is
+          taken of the page in its resting position — inside, it would be
+          re-photographing a tree that the gesture has already re-hung. */}
+      <PageTextureProvider>
+        {/* OrbWarp wraps the page AND renders ChatFooter (the stationary chat
+            backdrop that lives behind the page) inside its wrapper. */}
+        <OrbWarp>{children}</OrbWarp>
+        <TextureWarmIndicator />
+      </PageTextureProvider>
       <ScreenGlow />
       <OverscrollController />
       <AskButton />

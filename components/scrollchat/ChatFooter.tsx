@@ -177,13 +177,20 @@ export default function ChatFooter() {
       // fixed positioning resolves to the viewport.
       className="scrollchat-panel fixed inset-0 z-[9994] flex flex-col text-foreground outline-none"
     >
-      {/* Minimal close affordance (Escape also works). */}
+      {/* Minimal close affordance (Escape also works).
+
+          `z-20`, NOT `z-10`: the body wrapper below is also a positioned
+          `z-10`, and it comes later in DOM order, so an equal z-index makes IT
+          win the paint order and swallow every tap on this button. That reads
+          as a phone-only bug because the wrapper is `w-full max-w-3xl mx-auto`
+          — a centred 768px column that never reaches this corner on a desktop
+          viewport, but edge-to-edge on anything narrower than ~820px. */}
       <button
         type="button"
         onClick={close}
         aria-label="Close chat"
         tabIndex={open ? 0 : -1}
-        className="absolute right-4 top-4 z-10 rounded-full p-2 text-foreground/35 transition-colors hover:bg-foreground/5 hover:text-foreground/80"
+        className="absolute right-4 top-4 z-20 rounded-full p-2 text-foreground/35 transition-colors hover:bg-foreground/5 hover:text-foreground/80"
       >
         <svg
           viewBox="0 0 24 24"

@@ -13,6 +13,8 @@ import {
 
 import ChatFooter from "./ChatFooter";
 import { CHIP_DIAMETER, CHIP_CENTER_FROM_BOTTOM } from "@/lib/scrollchat/chip";
+import OrbSceneCanvas from "./OrbSceneCanvas";
+import { usePageTexture } from "./PageTextureProvider";
 import RefractionFilter, {
   REFERENCE_CHROMATIC_SAMPLES,
 } from "./GlassRefractionFilter";
@@ -320,6 +322,19 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
   // drag repaints even when `progress` is standing still — which is exactly the
   // case while tuning, since the pull holds at whatever it was left at.
   const tuning = useOrbTuning();
+  const { capture } = usePageTexture();
+  /*
+   * Set when the WebGL path reports it cannot run — no WebGL2, a software
+   * rasterizer, a failed compile, a lost context. Sticky for the life of the
+   * component: every one of those conditions is a property of the machine or
+   * the GPU's current state, not of this frame, so retrying each frame would
+   * only re-fail more expensively.
+   */
+  const [glassUnavailable, setGlassUnavailable] = useState<string | null>(null);
+  const onGlassUnavailable = useCallback(
+    (reason: string) => setGlassUnavailable(reason),
+    []
+  );
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<OrbStage | null>(null);
@@ -575,17 +590,54 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
    * (`ChatFooter`, and the page's own `ThemeToggle` and now-playing widget)
    * resolve to the same rectangle either way and nothing shifts.
    */
-  const lensActive =
+  const orbOnScreen =
     stage !== null &&
     orbPresence > 0.001 &&
     geometry.radius > 0.5 &&
     geometry.centerY - geometry.radius < stage.height;
+
+  /*
+   * Which refraction path takes the frame.
+   *
+   * The WebGL one is preferred wherever it is available because it is strictly
+   * cheaper AND strictly better: the SVG graph rasterizes the whole viewport
+   * through nine displacement passes every frame, while the shader touches only
+   * the pixels the orb covers — and being able to sample the page as a texture
+   * is what buys the magnification and the rim reflection the SVG path has to
+   * substitute painted terms for.
+   *
+   * `capture` is only non-null when the provider has one that MATCHES the
+   * current viewport and scroll offset, so this reads as "use the shader if we
+   * have a photograph of what is actually behind the orb". Everything else —
+   * a cold texture, a failed capture, a machine without WebGL2, a scroll that
+   * outran the warm — falls to the SVG path, which needs nothing and is the
+   * path the look was tuned on.
+   */
+  const glassActive = orbOnScreen && capture !== null && glassUnavailable === null;
+  const lensActive = orbOnScreen && !glassActive;
 
   return (
     <>
       <div
         ref={wrapperRef}
         data-orb-wrapper
+        /* Which refraction path took this frame. Development only, and purely
+           diagnostic: both paths are correct, so nothing outside a QA run has
+           any reason to care which one ran, and from the outside they are hard
+           to tell apart at a glance. */
+        data-orb-path={
+          process.env.NODE_ENV === "development"
+            ? glassActive
+              ? "webgl"
+              : `${lensActive ? "svg" : "idle"} (${
+                  glassUnavailable
+                    ? `webgl: ${glassUnavailable}`
+                    : capture
+                      ? "texture ready"
+                      : "no texture"
+                })`
+            : undefined
+        }
         /*
          * While the page is out of flow this wrapper is the only thing left
          * holding the document open. Without the pin, `position: absolute` on
@@ -690,6 +742,23 @@ export default function OrbWarp({ children }: { children: ReactNode }) {
             {children}
           </div>
         </div>
+
+        {/* The whole transition, when the shader is taking the frame: it paints
+            over the page and the chat below and stands in for both, because the
+            porthole crossfade it performs is not expressible as DOM opacity. */}
+        {glassActive && stage && capture && (
+          <OrbSceneCanvas
+            capture={capture}
+            center={{ x: geometry.centerX, y: geometry.centerY }}
+            radius={geometry.radius}
+            presence={orbPresence}
+            swap={afterOpacity}
+            sizeUnit={stage.sizeUnit}
+            refraction={tuning.refraction}
+            smallBoost={tuning.smallBoost}
+            onUnavailable={onGlassUnavailable}
+          />
+        )}
 
         {/* The orb's material, OUTSIDE the filter: none of it is a function of
             what is behind the glass, so putting it in the graph would only make
