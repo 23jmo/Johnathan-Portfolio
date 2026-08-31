@@ -31,6 +31,8 @@ function parseNote(
     tags: Array.isArray(data.tags) ? data.tags.map(String) : undefined,
     summary: typeof data.summary === "string" ? data.summary : undefined,
     draft: data.draft === true,
+    // Fixture notes stay published and get noindex instead of a 404.
+    noindex: data.noindex === true,
     content: includeContent ? content : "",
   };
 }

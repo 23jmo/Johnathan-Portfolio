@@ -71,6 +71,7 @@ export interface NotesDoc {
   tags?: string[];
   summary?: string;
   draft?: boolean;
+  noindex?: boolean;
   content: string;
 }
 

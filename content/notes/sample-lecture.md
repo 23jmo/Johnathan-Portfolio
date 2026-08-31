@@ -4,6 +4,7 @@ date: "2026-01-22"
 tags: ["systems", "c++", "fundamentals"]
 summary: "A whirlwind tour from C into modern C++: compilation, namespaces, RAII, the memory model, and the type system — every notes template exercised in one page."
 draft: false
+noindex: true
 ---
 
 # From C to C++

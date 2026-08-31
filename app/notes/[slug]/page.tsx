@@ -1,4 +1,5 @@
 import { getNoteBySlug, getAllNotes, extractToc } from "@/lib/notes";
+import { isExcludedNoteSlug, noindexRobots } from "@/lib/seo";
 import MarkdownRenderer from "@/components/notes/MarkdownRenderer";
 import TableOfContents from "@/components/notes/TableOfContents";
 import Link from "next/link";
@@ -19,9 +20,11 @@ export async function generateMetadata({
   const { slug } = await params;
   const note = getNoteBySlug(slug);
   if (!note) return { title: "Note Not Found" };
+  const hideFromIndex = note.noindex || isExcludedNoteSlug(slug);
   return {
     title: `${note.title} — Johnathan Mo`,
     description: note.summary,
+    ...(hideFromIndex ? { robots: noindexRobots } : {}),
   };
 }
 
