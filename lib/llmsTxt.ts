@@ -20,6 +20,7 @@ function plain(text: string): string {
     .replace(/\s*[—–]\s*/g, ". ")
     .replace(/,\s*not\s+[^.]+\.?/gi, ".")
     .replace(/\.\s*\./g, ".")
+    .replace(/\. ([a-z])/g, (_, letter: string) => `. ${letter.toUpperCase()}`)
     .trim();
 }
 
