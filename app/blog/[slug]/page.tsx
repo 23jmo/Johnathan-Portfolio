@@ -1,4 +1,5 @@
 import { getPostBySlug, getAllPosts } from "@/lib/blog";
+import { isExcludedBlogSlug, noindexRobots } from "@/lib/seo";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -24,6 +25,8 @@ export async function generateMetadata({
   return {
     title: `${post.title} — Johnathan Mo`,
     description: post.excerpt,
+    // Ugly/test slugs stay readable but out of the index.
+    ...(isExcludedBlogSlug(slug) ? { robots: noindexRobots } : {}),
   };
 }
 

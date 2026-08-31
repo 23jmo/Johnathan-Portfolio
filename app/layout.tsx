@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
 import { figtree } from "@/lib/fonts";
+import { SITE_URL } from "@/lib/seo";
 import CustomCursor from "@/components/ui/CustomCursor";
 import ScrollProgress from "@/components/ui/ScrollProgress";
 import PaperAirplane from "@/components/ui/PaperAirplane";
@@ -17,6 +18,7 @@ import "dialkit/styles.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Johnathan Mo",
   description:
     "CS student at Columbia University. Building software across research labs, startups, big tech, and quant.",
@@ -24,7 +26,7 @@ export const metadata: Metadata = {
     title: "Johnathan Mo",
     description:
       "CS student at Columbia University. Building software across research labs, startups, big tech, and quant.",
-    url: "https://johnathanmo.com",
+    url: SITE_URL,
     siteName: "Johnathan Mo",
     type: "website",
   },
